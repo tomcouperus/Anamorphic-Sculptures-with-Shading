@@ -52,5 +52,8 @@
         "Temp/": true
     },
     "dotnet.preferCSharpExtension": true,
-    "dotnet.defaultSolution": "Anamorphic Sculptures with Shading.sln"
+    "dotnet.defaultSolution": "Anamorphic Sculptures with Shading.sln",
+    "cSpell.words": [
+        "Mathf"
+    ]
 }
