@@ -15,7 +15,7 @@ public class CurvedSquareMirror : ProceduralMirror {
     [SerializeField]
     private CurveDirection curveDirection = CurveDirection.Horizontal;
     [SerializeField]
-    [Min(0)]
+    [Min(1)]
     private float radiusOfCurvature = 1;
 
     protected override MeshData GenerateMeshData() {
