@@ -23,24 +23,24 @@ public class CurvedSquareMirror : ProceduralMirror {
         int vertexIndex = 0;
         for (int y = 0; y < ySize; y++) {
             for (int x = 0; x < xSize; x++) {
-                // For now, generate a plane
                 float uCoord = (float) x / (xSize - 1);
                 float vCoord = (float) y / (ySize - 1);
                 float xCoord = uCoord * 2 - 1;
                 float yCoord = vCoord * 2 - 1;
-                float zCoord;
 
+                float theta = Mathf.Asin(1 / radiusOfCurvature);
+                float distOpticalCentre = radiusOfCurvature * Mathf.Cos(theta);
+
+                float alpha;
                 if (curveDirection == CurveDirection.Horizontal) {
-                    float distOpticalCentre = radiusOfCurvature * Mathf.Cos(Mathf.Asin(1 / radiusOfCurvature));
-
-                    float alpha = Mathf.Asin(yCoord / radiusOfCurvature);
-                    zCoord = radiusOfCurvature * Mathf.Cos(alpha) - distOpticalCentre;
+                    yCoord = radiusOfCurvature * Mathf.Sin(-theta + (theta * 2 / (ySize - 1) * y));
+                    alpha = Mathf.Asin(yCoord / radiusOfCurvature);
                 } else {
-                    float distOpticalCentre = radiusOfCurvature * Mathf.Sin(Mathf.Acos(1 / radiusOfCurvature));
-
-                    float alpha = Mathf.Acos(xCoord / radiusOfCurvature);
-                    zCoord = radiusOfCurvature * Mathf.Sin(alpha) - distOpticalCentre;
+                    xCoord = radiusOfCurvature * Mathf.Sin(-theta + (theta * 2 / (xSize - 1) * x));
+                    alpha = Mathf.Asin(xCoord / radiusOfCurvature);
                 }
+
+                float zCoord = radiusOfCurvature * Mathf.Cos(alpha) - distOpticalCentre;
 
                 Vector3 vertex = new(xCoord, yCoord, zCoord);
                 Vector2 uv = new(uCoord, vCoord);
