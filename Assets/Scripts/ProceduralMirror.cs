@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+[RequireComponent(typeof(MeshCollider))]
 public abstract class ProceduralMirror : Mirror {
 
     protected override void Awake() {
@@ -11,7 +12,11 @@ public abstract class ProceduralMirror : Mirror {
 
     public void CreateMirror() {
         MeshFilter meshFilter = GetComponent<MeshFilter>();
-        meshFilter.sharedMesh = GenerateMeshData().CreateMesh();
+        Mesh mesh = GenerateMeshData().CreateMesh();
+        meshFilter.sharedMesh = mesh;
+
+        MeshCollider meshCollider = GetComponent<MeshCollider>();
+        meshCollider.sharedMesh = mesh;
     }
 
     protected abstract MeshData GenerateMeshData();

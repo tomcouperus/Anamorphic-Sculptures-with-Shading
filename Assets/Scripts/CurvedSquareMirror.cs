@@ -4,11 +4,11 @@ public class CurvedSquareMirror : ProceduralMirror {
     [Header("Mirror resolution")]
     [SerializeField]
     [Range(3, 256)]
-    private int xSize = 3;
+    private int xSize = 10;
 
     [SerializeField]
     [Range(3, 256)]
-    private int ySize = 3;
+    private int ySize = 10;
 
     private enum CurveDirection { Horizontal, Vertical };
     [Header("Curvature")]
@@ -16,7 +16,7 @@ public class CurvedSquareMirror : ProceduralMirror {
     private CurveDirection curveDirection = CurveDirection.Horizontal;
     [SerializeField]
     [Min(1)]
-    private float radiusOfCurvature = 1;
+    private float radiusOfCurvature = 1.5f;
 
     protected override MeshData GenerateMeshData() {
         MeshData data = new(xSize, ySize);
