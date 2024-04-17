@@ -11,6 +11,7 @@ public abstract class ProceduralMirror : Mirror {
     }
 
     public void CreateMirror() {
+        // TODO memory leak with undestroyed meshes?
         MeshFilter meshFilter = GetComponent<MeshFilter>();
         Mesh mesh = GenerateMeshData().CreateMesh();
         meshFilter.sharedMesh = mesh;
