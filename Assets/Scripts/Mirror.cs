@@ -5,8 +5,5 @@ using UnityEngine;
 [RequireComponent(typeof(MeshRenderer))]
 [RequireComponent(typeof(MeshFilter))]
 public class Mirror : MonoBehaviour {
-    protected MeshFilter meshFilter;
-    protected virtual void Awake() {
-        meshFilter = GetComponent<MeshFilter>();
-    }
+    protected virtual void Awake() { }
 }
