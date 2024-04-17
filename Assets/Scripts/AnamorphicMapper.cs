@@ -52,7 +52,7 @@ public class AnamorphicMapper : MonoBehaviour {
             globalMeshVertices[i] = anamorphTransform.TransformPoint(vertices[i]);
         }
         // Create raycasts
-        Vector3 origin = viewer.position;
+        Vector3 origin = viewer.position; // Use as null value, as Vector3 is not nullable
         raycastDirections = new Vector3[vertices.Length];
         for (int i = 0; i < vertices.Length; i++) {
             raycastDirections[i] = globalMeshVertices[i] - origin;
@@ -82,10 +82,23 @@ public class AnamorphicMapper : MonoBehaviour {
             reflections[i] *= Vector3.Distance(globalMeshVertices[i], mirrorHits[i]);
         }
         // Calculate new mesh
+        Mesh mappedMesh = new Mesh();
         mappedVertices = new Vector3[vertices.Length];
         for (int i = 0; i < vertices.Length; i++) {
             mappedVertices[i] = mirrorHits[i] + reflections[i];
         }
+        int[] mappedTriangles = new int[anamorphMesh.triangles.Length];
+        for (int i = 0; i < mappedTriangles.Length; i += 3) {
+            mappedTriangles[i] = anamorphMesh.triangles[i + 2];
+            mappedTriangles[i + 1] = anamorphMesh.triangles[i + 1];
+            mappedTriangles[i + 2] = anamorphMesh.triangles[i];
+        }
+
+        mappedMesh.SetVertices(mappedVertices);
+        mappedMesh.SetTriangles(mappedTriangles, 0);
+        mappedMesh.SetUVs(0, anamorphMesh.uv);
+        mappedMesh.RecalculateNormals();
+        GetComponent<MeshFilter>().sharedMesh = mappedMesh;
 
         ShowMaxLimit = vertices.Length - 1;
     }
