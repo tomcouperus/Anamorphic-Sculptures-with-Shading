@@ -18,11 +18,7 @@ public class AnamorphicMapper : MonoBehaviour {
         // Transform all vertices of target mesh to global space.
         Transform anamorphTransform = anamorphObject.transform;
         Mesh anamorphMesh;
-        if (EditorApplication.isPlaying) {
-            anamorphMesh = anamorphObject.GetComponent<MeshFilter>().mesh;
-        } else {
-            anamorphMesh = anamorphObject.GetComponent<MeshFilter>().sharedMesh;
-        }
+        anamorphMesh = anamorphObject.GetComponent<MeshFilter>().sharedMesh;
         Vector3[] vertices = anamorphMesh.vertices;
         globalMeshVertices = new Vector3[vertices.Length];
         for (int i = 0; i < vertices.Length; i++) {
