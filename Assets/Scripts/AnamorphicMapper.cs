@@ -17,6 +17,8 @@ public class AnamorphicMapper : MonoBehaviour {
     [Range(1, 5)]
     private int maxReflections = 3;
 
+    private bool mapped = false;
+
     [Header("Debug")]
     [SerializeField]
     private Vector3[] globalMeshVertices = null;
@@ -120,22 +122,26 @@ public class AnamorphicMapper : MonoBehaviour {
         GetComponent<MeshFilter>().sharedMesh = mappedMesh;
 
         ShowMaxLimit = vertices.Length - 1;
+        mapped = true;
     }
 
     public void Clear() {
+        mapped = false;
         globalMeshVertices = null;
         raycastDirections = null;
+        numReflections = null;
         mirrorHits = null;
         mirrorNormals = null;
         reflections = null;
         mappedVertices = null;
+        GetComponent<MeshFilter>().sharedMesh = null;
     }
 
     private void OnDrawGizmosSelected() {
         Vector3 origin = viewer.position;
 
         Gizmos.color = Color.white;
-        if (showGlobalMeshVertices && globalMeshVertices != null) {
+        if (showGlobalMeshVertices && mapped) {
             for (int i = (int) showMin; i <= showMax; i++) {
                 if (numReflections[i] == 0) Gizmos.color = Color.red;
                 Gizmos.DrawSphere(globalMeshVertices[i], 0.1f);
@@ -143,7 +149,7 @@ public class AnamorphicMapper : MonoBehaviour {
             }
         }
         Gizmos.color = Color.white;
-        if (showRaycastDirections && raycastDirections != null && viewer != null) {
+        if (showRaycastDirections && mapped) {
             for (int i = (int) showMin; i <= showMax; i++) {
                 if (numReflections[i] == 0) Gizmos.color = Color.red;
                 Gizmos.DrawLine(origin, origin + raycastDirections[i]);
@@ -151,7 +157,7 @@ public class AnamorphicMapper : MonoBehaviour {
             }
         }
         Gizmos.color = Color.white;
-        if (showMirrorHits && mirrorHits != null) {
+        if (showMirrorHits && mapped) {
             for (int i = (int) showMin; i <= showMax; i++) {
                 for (int r = 0; r < numReflections[i]; r++) {
                     Gizmos.DrawSphere(mirrorHits[i, r], 0.1f);
@@ -159,7 +165,7 @@ public class AnamorphicMapper : MonoBehaviour {
             }
         }
         Gizmos.color = Color.blue;
-        if (showReflections && reflections != null) {
+        if (showReflections && mapped) {
             for (int i = (int) showMin; i <= showMax; i++) {
                 for (int r = 0; r < numReflections[i]; r++) {
                     Gizmos.DrawLine(mirrorHits[i, r], mirrorHits[i, r] + reflections[i, r]);
@@ -167,7 +173,7 @@ public class AnamorphicMapper : MonoBehaviour {
             }
         }
         Gizmos.color = Color.white;
-        if (showMappedVertices && mappedVertices != null) {
+        if (showMappedVertices && mapped) {
             for (int i = (int) showMin; i <= showMax; i++) {
                 if (numReflections[i] == 0) continue;
                 Gizmos.DrawSphere(mappedVertices[i], 0.1f);
