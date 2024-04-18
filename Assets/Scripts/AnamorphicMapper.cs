@@ -42,6 +42,8 @@ public class AnamorphicMapper : MonoBehaviour {
     [SerializeField]
     private bool showMirrorHits = false;
     [SerializeField]
+    private bool showMirrorNormals = false;
+    [SerializeField]
     private bool showReflections = false;
     [SerializeField]
     private bool showMappedVertices = false;
@@ -161,6 +163,14 @@ public class AnamorphicMapper : MonoBehaviour {
             for (int i = (int) showMin; i <= showMax; i++) {
                 for (int r = 0; r < numReflections[i]; r++) {
                     Gizmos.DrawSphere(mirrorHits[i, r], 0.1f);
+                }
+            }
+        }
+        Gizmos.color = Color.green;
+        if (showMirrorNormals && mapped) {
+            for (int i = (int) showMin; i <= showMax; i++) {
+                for (int r = 0; r < numReflections[i]; r++) {
+                    Gizmos.DrawLine(mirrorHits[i, r], mirrorHits[i, r] + mirrorNormals[i, r]);
                 }
             }
         }
