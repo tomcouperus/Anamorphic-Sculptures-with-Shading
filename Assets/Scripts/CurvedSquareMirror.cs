@@ -11,7 +11,10 @@ public class CurvedSquareMirror : ProceduralMirror {
     private int ySize = 10;
 
     private enum CurveDirection { Horizontal, Vertical };
+    private enum Concavity { Concave, Convex };
     [Header("Curvature")]
+    [SerializeField]
+    private Concavity concavity = Concavity.Concave;
     [SerializeField]
     private CurveDirection curveDirection = CurveDirection.Horizontal;
     [SerializeField]
@@ -40,7 +43,12 @@ public class CurvedSquareMirror : ProceduralMirror {
                     alpha = Mathf.Asin(xCoord / radiusOfCurvature);
                 }
 
-                float zCoord = radiusOfCurvature * Mathf.Cos(alpha) - distOpticalCentre;
+                float zCoord;
+                if (concavity == Concavity.Concave) {
+                    zCoord = radiusOfCurvature * Mathf.Cos(alpha) - distOpticalCentre;
+                } else {
+                    zCoord = radiusOfCurvature * Mathf.Cos(alpha + Mathf.PI) + distOpticalCentre;
+                }
 
                 Vector3 vertex = new(xCoord, yCoord, zCoord);
                 Vector2 uv = new(uCoord, vCoord);
