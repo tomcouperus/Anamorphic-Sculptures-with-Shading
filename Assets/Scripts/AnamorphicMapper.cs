@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(MeshRenderer))]
@@ -19,6 +20,14 @@ public class AnamorphicMapper : MonoBehaviour {
 
     private bool mapped = false;
 
+    private enum RenderMode { Texture, Normals };
+    [Header("Materials")]
+    [SerializeField]
+    private Material objectMaterial;
+    [SerializeField]
+    private Material normalsMaterial;
+    [SerializeField]
+    private RenderMode renderMode = RenderMode.Texture;
     [Header("Debug")]
     [SerializeField]
     private Vector3[] globalMeshVertices = null;
@@ -189,5 +198,24 @@ public class AnamorphicMapper : MonoBehaviour {
                 Gizmos.DrawSphere(mappedVertices[i], 0.1f);
             }
         }
+    }
+
+    private void SwitchMaterials() {
+        if (anamorphObject == null) return;
+        Material mat = null;
+        switch (renderMode) {
+            case RenderMode.Texture:
+                mat = objectMaterial;
+                break;
+            case RenderMode.Normals:
+                mat = normalsMaterial;
+                break;
+        }
+        anamorphObject.GetComponent<MeshRenderer>().material = mat;
+        GetComponent<MeshRenderer>().material = mat;
+    }
+
+    private void OnValidate() {
+        SwitchMaterials();
     }
 }
