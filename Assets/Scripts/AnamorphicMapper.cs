@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(MeshRenderer))]
@@ -78,6 +77,8 @@ public class AnamorphicMapper : MonoBehaviour {
         mirrorHits = new Vector3[vertices.Length, maxReflections];
         mirrorNormals = new Vector3[vertices.Length, maxReflections];
         reflections = new Vector3[vertices.Length, maxReflections];
+
+        bool allCastsHit = true;
         for (int i = 0; i < vertices.Length; i++) {
             // Initial raycast
             Vector3 origin = viewer.position; // Use as null value, as Vector3 is not nullable
@@ -87,7 +88,10 @@ public class AnamorphicMapper : MonoBehaviour {
             RaycastHit[] hits = Physics.RaycastAll(origin, direction, maxRaycastDistance);
 
             numReflections[i] = 0;
-            if (hits.Length == 0) continue;
+            if (hits.Length == 0) {
+                allCastsHit = false;
+                continue;
+            }
 
             mirrorHits[i, 0] = hits[0].point;
             mirrorNormals[i, 0] = hits[0].normal;
@@ -111,12 +115,16 @@ public class AnamorphicMapper : MonoBehaviour {
                 numReflections[i]++;
             }
         }
+        if (!allCastsHit) {
+            Debug.Log("Some initial raycasts did not hit the mirror. Reposition the mirror or increase the maximum raycast distance.");
+        }
 
         // Use the final reflections to create mesh
         Mesh mappedMesh = new Mesh();
         mappedVertices = new Vector3[vertices.Length];
         for (int i = 0; i < vertices.Length; i++) {
             int lastReflection = numReflections[i] - 1;
+            if (lastReflection < 0) continue;
             mappedVertices[i] = mirrorHits[i, lastReflection] + reflections[i, lastReflection];
         }
         int[] mappedTriangles = new int[anamorphMesh.triangles.Length];
