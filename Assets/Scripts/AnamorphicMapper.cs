@@ -17,10 +17,10 @@ public class AnamorphicMapper : MonoBehaviour {
     [Range(1, 7)]
     [Tooltip("Maximum amount of reflections allowed for recursive rays.")]
     private int maxReflections = 3;
-    // [SerializeField]
-    // [Min(0.00001f)]
-    // [Tooltip("Minimum distance between mirror and mapped vertices as multiple of anamorph object bounding box.")]
-    // private float minDistance = 1.0f;
+    [SerializeField]
+    [Min(0.00001f)]
+    [Tooltip("Minimum distance between mirror and mapped vertices as multiple of anamorph object bounding box.")]
+    private float minDistance = 1.0f;
     [SerializeField]
     [Min(0.00001f)]
     [Tooltip("Linearly scales the distance between mirror and mapped vertices.")]
@@ -126,6 +126,15 @@ public class AnamorphicMapper : MonoBehaviour {
         }
         if (!allCastsHit) {
             Debug.Log("Some initial raycasts did not hit the mirror. Reposition the mirror or increase the maximum raycast distance.");
+        }
+
+        // Take the minimum distance into account
+        for (int i = 0; i < vertices.Length; i++) {
+            int lastReflection = numReflections[i] - 1;
+            if (lastReflection < 0) continue;
+            if (reflections[i, lastReflection].magnitude >= minDistance) continue;
+            reflections[i, lastReflection].Normalize();
+            reflections[i, lastReflection] *= minDistance;
         }
 
         // Use the final reflections to create mesh
