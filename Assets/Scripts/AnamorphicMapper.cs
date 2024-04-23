@@ -14,10 +14,16 @@ public class AnamorphicMapper : MonoBehaviour {
     [Range(0, 100)]
     private float maxRaycastDistance = 20f;
     [SerializeField]
-    [Range(1, 5)]
+    [Range(1, 7)]
+    [Tooltip("Maximum amount of reflections allowed for recursive rays.")]
     private int maxReflections = 3;
+    // [SerializeField]
+    // [Min(0.00001f)]
+    // [Tooltip("Minimum distance between mirror and mapped vertices as multiple of anamorph object bounding box.")]
+    // private float minDistance = 1.0f;
     [SerializeField]
     [Min(0.00001f)]
+    [Tooltip("Linearly scales the distance between mirror and mapped vertices.")]
     private float scale = 1.0f;
 
     private bool mapped = false;
