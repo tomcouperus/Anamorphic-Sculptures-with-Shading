@@ -17,6 +17,7 @@ public class AnamorphicMapper : MonoBehaviour {
     [Range(1, 5)]
     private int maxReflections = 3;
     [SerializeField]
+    [Min(0.00001f)]
     private float scale = 1.0f;
 
     private bool mapped = false;
