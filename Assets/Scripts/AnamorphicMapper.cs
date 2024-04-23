@@ -16,6 +16,8 @@ public class AnamorphicMapper : MonoBehaviour {
     [SerializeField]
     [Range(1, 5)]
     private int maxReflections = 3;
+    [SerializeField]
+    private float scale = 1.0f;
 
     private bool mapped = false;
 
@@ -125,7 +127,7 @@ public class AnamorphicMapper : MonoBehaviour {
         for (int i = 0; i < vertices.Length; i++) {
             int lastReflection = numReflections[i] - 1;
             if (lastReflection < 0) continue;
-            mappedVertices[i] = mirrorHits[i, lastReflection] + reflections[i, lastReflection];
+            mappedVertices[i] = mirrorHits[i, lastReflection] + reflections[i, lastReflection] * scale;
         }
         int[] mappedTriangles = new int[anamorphMesh.triangles.Length];
         for (int i = 0; i < mappedTriangles.Length; i += 3) {
