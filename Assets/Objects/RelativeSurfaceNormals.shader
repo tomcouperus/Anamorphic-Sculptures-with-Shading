@@ -39,7 +39,7 @@ Shader "Unlit/Relative Surface Normals"
             {
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
-                o.normal = v.normal - v.originalNormal;
+                o.normal = v.originalNormal;
                 return o;
             }
 
