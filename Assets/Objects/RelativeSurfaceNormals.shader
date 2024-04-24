@@ -1,4 +1,4 @@
-Shader "Unlit/Surface Normals"
+Shader "Unlit/Relative Surface Normals"
 {
     Properties
     {
@@ -23,6 +23,7 @@ Shader "Unlit/Surface Normals"
             {
                 float4 vertex : POSITION;
                 float3 normal : NORMAL;
+                float3 originalNormal : TEXCOORD1;
             };
 
             struct v2f
@@ -38,7 +39,7 @@ Shader "Unlit/Surface Normals"
             {
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
-                o.normal = v.normal;
+                o.normal = v.normal - v.originalNormal;
                 return o;
             }
 

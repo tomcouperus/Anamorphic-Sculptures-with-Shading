@@ -28,12 +28,14 @@ public class AnamorphicMapper : MonoBehaviour {
 
     private bool mapped = false;
 
-    private enum RenderMode { Texture, Normals };
+    private enum RenderMode { Texture, Normals, RelativeNormals };
     [Header("Materials")]
     [SerializeField]
     private Material objectMaterial;
     [SerializeField]
     private Material normalsMaterial;
+    [SerializeField]
+    private Material relativeNormalsMaterial;
     [SerializeField]
     private RenderMode renderMode = RenderMode.Texture;
     [Header("Debug")]
@@ -155,6 +157,7 @@ public class AnamorphicMapper : MonoBehaviour {
         mappedMesh.SetVertices(mappedVertices);
         mappedMesh.SetTriangles(mappedTriangles, 0);
         mappedMesh.SetUVs(0, anamorphMesh.uv);
+        mappedMesh.SetUVs(1, anamorphMesh.normals);
         mappedMesh.RecalculateNormals();
         GetComponent<MeshFilter>().sharedMesh = mappedMesh;
 
@@ -228,17 +231,22 @@ public class AnamorphicMapper : MonoBehaviour {
 
     private void SwitchMaterials() {
         if (anamorphObject == null) return;
-        Material mat = null;
+        MeshRenderer anamorphMeshRenderer = anamorphObject.GetComponent<MeshRenderer>();
+        MeshRenderer mappedMeshRenderer = GetComponent<MeshRenderer>();
         switch (renderMode) {
             case RenderMode.Texture:
-                mat = objectMaterial;
+                anamorphMeshRenderer.material = objectMaterial;
+                mappedMeshRenderer.material = objectMaterial;
                 break;
             case RenderMode.Normals:
-                mat = normalsMaterial;
+                anamorphMeshRenderer.material = normalsMaterial;
+                mappedMeshRenderer.material = normalsMaterial;
+                break;
+            case RenderMode.RelativeNormals:
+                anamorphMeshRenderer.material = normalsMaterial;
+                mappedMeshRenderer.material = relativeNormalsMaterial;
                 break;
         }
-        anamorphObject.GetComponent<MeshRenderer>().material = mat;
-        GetComponent<MeshRenderer>().material = mat;
     }
 
     private void OnValidate() {
