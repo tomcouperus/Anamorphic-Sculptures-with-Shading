@@ -29,6 +29,7 @@ public class AnamorphicMapper : MonoBehaviour {
     private bool mapped = false;
 
     private enum RenderMode { Texture, Normals, RelativeNormals };
+    private enum RelativePlane { XY, YZ, XZ };
     [Header("Materials")]
     [SerializeField]
     private Material objectMaterial;
@@ -38,6 +39,8 @@ public class AnamorphicMapper : MonoBehaviour {
     private Material relativeNormalsMaterial;
     [SerializeField]
     private RenderMode renderMode = RenderMode.Texture;
+    [SerializeField]
+    private RelativePlane relativePlane = RelativePlane.XY;
     [Header("Debug")]
     [SerializeField]
     private Vector3[] globalMeshVertices = null;
@@ -229,7 +232,7 @@ public class AnamorphicMapper : MonoBehaviour {
         }
     }
 
-    private void SwitchMaterials() {
+    private void UpdateMaterials() {
         if (anamorphObject == null) return;
         MeshRenderer anamorphMeshRenderer = anamorphObject.GetComponent<MeshRenderer>();
         MeshRenderer mappedMeshRenderer = GetComponent<MeshRenderer>();
@@ -249,7 +252,24 @@ public class AnamorphicMapper : MonoBehaviour {
         }
     }
 
+    private void UpdateRelativeMode() {
+        if (relativeNormalsMaterial == null) return;
+        string propName = "_RelativeMode";
+        switch (relativePlane) {
+            case RelativePlane.XY:
+                relativeNormalsMaterial.SetInteger(propName, 1);
+                break;
+            case RelativePlane.YZ:
+                relativeNormalsMaterial.SetInteger(propName, 2);
+                break;
+            case RelativePlane.XZ:
+                relativeNormalsMaterial.SetInteger(propName, 3);
+                break;
+        }
+    }
+
     private void OnValidate() {
-        SwitchMaterials();
+        UpdateRelativeMode();
+        UpdateMaterials();
     }
 }
