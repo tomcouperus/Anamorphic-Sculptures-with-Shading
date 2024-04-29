@@ -161,7 +161,7 @@ public class AnamorphicMapper : MonoBehaviour {
         mappedMesh.SetVertices(mappedVertices);
         mappedMesh.SetTriangles(mappedTriangles, 0);
         mappedMesh.SetUVs(0, anamorphMesh.uv);
-        mappedMesh.SetUVs(1, anamorphMesh.normals);
+        mappedMesh.SetUVs(3, anamorphMesh.normals); // Using uv 3, since unity doc says that 1 and 2 can be used for various lightmaps
         mappedMesh.RecalculateNormals();
         GetComponent<MeshFilter>().sharedMesh = mappedMesh;
 

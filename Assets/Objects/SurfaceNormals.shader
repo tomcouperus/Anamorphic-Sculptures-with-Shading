@@ -1,8 +1,5 @@
-Shader "Unlit/Surface Normals"
+Shader "Normals/Surface Normals"
 {
-    Properties
-    {
-    }
     SubShader
     {
         Tags { "RenderType"="Opaque" }

@@ -1,4 +1,4 @@
-Shader "Unlit/Relative Surface Normals"
+Shader "Normals/Relative Surface Normals"
 {
     Properties
     {
@@ -26,14 +26,14 @@ Shader "Unlit/Relative Surface Normals"
             {
                 float4 vertex : POSITION;
                 float3 normal : NORMAL;
-                float3 originalNormal : TEXCOORD1;
+                float3 originalNormal : TEXCOORD3;
             };
 
             struct v2f
             {
                 float4 vertex : SV_POSITION;
                 float3 normal : NORMAL;
-                float3 originalNormal : TEXCOORD1;
+                float3 originalNormal : TEXCOORD3;
             };
 
             // Return the angle in radians between two 2D vectors
