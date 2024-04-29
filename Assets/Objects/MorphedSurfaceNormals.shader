@@ -1,8 +1,8 @@
-Shader "Normals/Relative Surface Normals"
+Shader "Normals/Morphed Surface Normals"
 {
     Properties
     {
-        _RelativeMode ("Which plane to use for angle calculation. 1=XY, 2=YZ, 3=XZ. Out of range uses XY plane.", Integer) = 1
+        _RelativePlane ("Which plane to use for angle calculation. 1=XY, 2=YZ, 3=XZ. Out of range uses XY plane.", Integer) = 1
     }
     SubShader
     {
@@ -20,8 +20,9 @@ Shader "Normals/Relative Surface Normals"
             #include "UnityCG.cginc"
             #define PI 3.14159265358
 
-            uniform int _RelativeMode;
+            uniform int _RelativePlane;
 
+            // Vertex shader input
             struct appdata
             {
                 float4 vertex : POSITION;
@@ -29,6 +30,7 @@ Shader "Normals/Relative Surface Normals"
                 float3 originalNormal : TEXCOORD3;
             };
 
+            // Vertex shader output / fragment shader input
             struct v2f
             {
                 float4 vertex : SV_POSITION;
@@ -42,6 +44,7 @@ Shader "Normals/Relative Surface Normals"
                 return acos(dot(a,b) / (length(a) * length(b)));
             }
 
+            // Vertex shader
             v2f vert (appdata v)
             {
                 v2f o;
@@ -51,13 +54,14 @@ Shader "Normals/Relative Surface Normals"
                 return o;
             }
 
+            // Fragment shader
             fixed4 frag (v2f i) : SV_Target
             {
                 float angleXY = angle2(i.normal.xy, i.originalNormal.xy);
                 float angleYZ = angle2(i.normal.yz, i.originalNormal.yz);
                 float angleXZ = angle2(i.normal.xz, i.originalNormal.xz);
                 fixed4 color;
-                switch (_RelativeMode) 
+                switch (_RelativePlane) 
                 {
                     case 3:
                         color = fixed4(angleXZ, angleXZ, angleXZ, 0);

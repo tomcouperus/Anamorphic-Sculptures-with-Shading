@@ -36,7 +36,7 @@ public class AnamorphicMapper : MonoBehaviour {
     [SerializeField]
     private Material normalsMaterial;
     [SerializeField]
-    private Material relativeNormalsMaterial;
+    private Material morphedNormalsMaterial;
     [SerializeField]
     private RenderMode renderMode = RenderMode.Texture;
     [SerializeField]
@@ -248,29 +248,29 @@ public class AnamorphicMapper : MonoBehaviour {
                 break;
             case RenderMode.RelativeNormals:
                 anamorphMeshRenderer.material = normalsMaterial;
-                mappedMeshRenderer.material = relativeNormalsMaterial;
+                mappedMeshRenderer.material = morphedNormalsMaterial;
                 break;
         }
     }
 
-    private void UpdateRelativeMode() {
-        if (relativeNormalsMaterial == null) return;
-        string propName = "_RelativeMode";
+    private void UpdateShaderRelativePlane() {
+        if (morphedNormalsMaterial == null) return;
+        string propName = "_RelativePlane";
         switch (relativePlane) {
             case RelativePlane.XY:
-                relativeNormalsMaterial.SetInteger(propName, 1);
+                morphedNormalsMaterial.SetInteger(propName, 1);
                 break;
             case RelativePlane.YZ:
-                relativeNormalsMaterial.SetInteger(propName, 2);
+                morphedNormalsMaterial.SetInteger(propName, 2);
                 break;
             case RelativePlane.XZ:
-                relativeNormalsMaterial.SetInteger(propName, 3);
+                morphedNormalsMaterial.SetInteger(propName, 3);
                 break;
         }
     }
 
     private void OnValidate() {
-        UpdateRelativeMode();
+        UpdateShaderRelativePlane();
         UpdateMaterials();
     }
 }

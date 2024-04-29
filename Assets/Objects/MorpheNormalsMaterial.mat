@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: RelativeNormalsMaterial
+  m_Name: MorpheNormalsMaterial
   m_Shader: {fileID: 4800000, guid: 5404c200c2c3647498ce70cf542dd413, type: 3}
   m_ValidKeywords: []
   m_InvalidKeywords: []
@@ -58,6 +58,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints:
     - _RelativeMode: 3
+    - _RelativePlane: 1
     m_Floats:
     - _BumpScale: 1
     - _Cutoff: 0.5
