@@ -30,7 +30,7 @@ public class AnamorphicMapper : MonoBehaviour {
 
     private enum RenderMode { Texture, Normals, RelativeNormals };
     private enum RelativePlane { XY, YZ, XZ };
-    [Header("Materials")]
+    [Header("Rendering")]
     [SerializeField]
     private Material objectMaterial;
     [SerializeField]
