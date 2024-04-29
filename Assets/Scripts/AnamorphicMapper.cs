@@ -3,6 +3,9 @@ using UnityEngine;
 [RequireComponent(typeof(MeshRenderer))]
 [RequireComponent(typeof(MeshFilter))]
 public class AnamorphicMapper : MonoBehaviour {
+    private const string NORMAL_SHADER_MODE_PROP_NAME = "_Mode";
+    private const string NORMAL_SHADER_RELATIVE_PLANE_PROP_NAME = "_RelativePlane";
+
     [Header("Settings")]
     [SerializeField]
     private Transform viewer;
@@ -244,27 +247,28 @@ public class AnamorphicMapper : MonoBehaviour {
                 break;
             case RenderMode.Normals:
                 anamorphMeshRenderer.material = normalsMaterial;
-                mappedMeshRenderer.material = normalsMaterial;
+                mappedMeshRenderer.material = morphedNormalsMaterial;
+                morphedNormalsMaterial.SetInteger(NORMAL_SHADER_MODE_PROP_NAME, 1);
                 break;
             case RenderMode.RelativeNormals:
                 anamorphMeshRenderer.material = normalsMaterial;
                 mappedMeshRenderer.material = morphedNormalsMaterial;
+                morphedNormalsMaterial.SetInteger(NORMAL_SHADER_MODE_PROP_NAME, 2);
                 break;
         }
     }
 
     private void UpdateShaderRelativePlane() {
         if (morphedNormalsMaterial == null) return;
-        string propName = "_RelativePlane";
         switch (relativePlane) {
             case RelativePlane.XY:
-                morphedNormalsMaterial.SetInteger(propName, 1);
+                morphedNormalsMaterial.SetInteger(NORMAL_SHADER_RELATIVE_PLANE_PROP_NAME, 1);
                 break;
             case RelativePlane.YZ:
-                morphedNormalsMaterial.SetInteger(propName, 2);
+                morphedNormalsMaterial.SetInteger(NORMAL_SHADER_RELATIVE_PLANE_PROP_NAME, 2);
                 break;
             case RelativePlane.XZ:
-                morphedNormalsMaterial.SetInteger(propName, 3);
+                morphedNormalsMaterial.SetInteger(NORMAL_SHADER_RELATIVE_PLANE_PROP_NAME, 3);
                 break;
         }
     }

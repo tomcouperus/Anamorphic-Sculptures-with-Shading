@@ -2,7 +2,8 @@ Shader "Normals/Morphed Surface Normals"
 {
     Properties
     {
-        _RelativePlane ("Which plane to use for angle calculation. 1=XY, 2=YZ, 3=XZ. Out of range uses XY plane.", Integer) = 1
+        _Mode ("Which mode to use for showing the morphed normals. 1=Normal, 2=Relative angle. Out of range uses 1.", Integer) = 1
+        _RelativePlane ("Which plane to use for angle calculation. 1=XY, 2=YZ, 3=XZ. Out of range uses 1.", Integer) = 1
     }
     SubShader
     {
@@ -20,6 +21,7 @@ Shader "Normals/Morphed Surface Normals"
             #include "UnityCG.cginc"
             #define PI 3.14159265358
 
+            uniform int _Mode;
             uniform int _RelativePlane;
 
             // Vertex shader input
@@ -54,8 +56,16 @@ Shader "Normals/Morphed Surface Normals"
                 return o;
             }
 
-            // Fragment shader
-            fixed4 frag (v2f i) : SV_Target
+            // Reflected mode -- fragment shader
+            fixed4 reflectedMode(v2f i)
+            {
+                float3 normal = normalize(i.normal);
+                float3 color = (normal + 1) * 0.5;
+                return fixed4(color.rgb, 0);
+            }
+
+            // Relative mode -- fragment shader 
+            fixed4 relativeMode(v2f i)
             {
                 float angleXY = angle2(i.normal.xy, i.originalNormal.xy);
                 float angleYZ = angle2(i.normal.yz, i.originalNormal.yz);
@@ -75,6 +85,20 @@ Shader "Normals/Morphed Surface Normals"
                         break;
                 }
                 return color / (2*PI);
+            }
+            
+            // Main fragment shader 
+            fixed4 frag (v2f i) : SV_Target
+            {
+                i.normal.z = -i.normal.z;
+                switch(_Mode)
+                {
+                    case 2:
+                        return relativeMode(i);
+                    case 1:
+                    default:
+                        return reflectedMode(i);
+                }
             }
             ENDCG
         }
