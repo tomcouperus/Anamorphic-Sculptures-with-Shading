@@ -2,7 +2,6 @@ Shader "Unlit/Relative Surface Normals"
 {
     Properties
     {
-        _MainTex ("Texture", 2D) = "white" {}
     }
     SubShader
     {
@@ -31,9 +30,6 @@ Shader "Unlit/Relative Surface Normals"
                 float4 vertex : SV_POSITION;
                 float3 normal : NORMAL;
             };
-
-            sampler2D _MainTex;
-            float4 _MainTex_ST;
 
             v2f vert (appdata v)
             {
