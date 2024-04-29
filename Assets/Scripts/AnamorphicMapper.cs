@@ -40,6 +40,7 @@ public class AnamorphicMapper : MonoBehaviour {
     [SerializeField]
     private RenderMode renderMode = RenderMode.Texture;
     [SerializeField]
+    [Tooltip("In render mode 'Relative' this determines the plane in which the angle is calculated.")]
     private RelativePlane relativePlane = RelativePlane.XY;
     [Header("Debug")]
     [SerializeField]
