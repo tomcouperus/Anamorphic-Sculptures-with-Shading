@@ -4,11 +4,11 @@ public class CurvedSquareMirror : ProceduralMirror {
     [Header("Mirror resolution")]
     [SerializeField]
     [Range(3, 256)]
-    private int xSize = 10;
+    private int xSize = 100;
 
     [SerializeField]
     [Range(3, 256)]
-    private int ySize = 10;
+    private int ySize = 100;
 
     private enum CurveDirection { Horizontal, Vertical };
     private enum Concavity { Concave, Convex };
