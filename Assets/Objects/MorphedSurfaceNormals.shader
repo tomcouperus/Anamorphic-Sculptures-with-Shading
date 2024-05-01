@@ -84,7 +84,7 @@ Shader "Normals/Morphed Surface Normals"
                         color = fixed4(angleXY, angleXY, angleXY, 0);
                         break;
                 }
-                return color / (2*PI);
+                return color / PI;
             }
             
             // Main fragment shader 
