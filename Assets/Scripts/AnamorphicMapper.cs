@@ -31,7 +31,7 @@ public class AnamorphicMapper : MonoBehaviour {
 
     private bool mapped = false;
 
-    private enum RenderMode { Texture, Normals, RelativeNormals };
+    private enum RenderMode { Texture, Normals, ObjectRelativeNormals };
     private enum RelativePlane { XY, YZ, XZ };
     [Header("Rendering")]
     [SerializeField]
@@ -44,7 +44,8 @@ public class AnamorphicMapper : MonoBehaviour {
     private RenderMode renderMode = RenderMode.Texture;
     [SerializeField]
     [Tooltip("In render mode 'Relative' this determines the plane in which the angle is calculated.")]
-    private RelativePlane relativePlane = RelativePlane.XY;
+    private RelativePlane relativePlane = RelativePlane.XZ;
+
     [Header("Debug")]
     [SerializeField]
     private Vector3[] globalMeshVertices = null;
@@ -62,7 +63,9 @@ public class AnamorphicMapper : MonoBehaviour {
     private Vector3[] mappedVertices = null;
 
     [SerializeField]
-    private bool showGlobalMeshVertices = false;
+    private bool showMeshVertices = false;
+    [SerializeField]
+    private bool showMeshNormals = false;
     [SerializeField]
     private bool showRaycastDirections = false;
     [SerializeField]
@@ -73,6 +76,10 @@ public class AnamorphicMapper : MonoBehaviour {
     private bool showReflections = false;
     [SerializeField]
     private bool showMappedVertices = false;
+    [SerializeField]
+    private bool showMappedNormals = false;
+    [SerializeField]
+    private bool showAdditionalReflectionDistance = false;
 
     public float showMin = 0;
     public float showMax = 0;
@@ -164,7 +171,9 @@ public class AnamorphicMapper : MonoBehaviour {
         mappedMesh.SetVertices(mappedVertices);
         mappedMesh.SetTriangles(mappedTriangles, 0);
         mappedMesh.SetUVs(0, anamorphMesh.uv);
-        mappedMesh.SetUVs(3, anamorphMesh.normals); // Using uv 3, since unity doc says that 1 and 2 can be used for various lightmaps
+        // Send the original normals to the shader as uv values;
+        // Using uv 3, since unity doc says that 1 and 2 can be used for various lightmaps
+        mappedMesh.SetUVs(3, anamorphMesh.normals);
         mappedMesh.RecalculateNormals();
         GetComponent<MeshFilter>().sharedMesh = mappedMesh;
 
@@ -188,11 +197,20 @@ public class AnamorphicMapper : MonoBehaviour {
         Vector3 origin = viewer.position;
 
         Gizmos.color = Color.white;
-        if (showGlobalMeshVertices && mapped) {
+        if (showMeshVertices && mapped) {
             for (int i = (int) showMin; i <= showMax; i++) {
                 if (numReflections[i] == 0) Gizmos.color = Color.red;
                 Gizmos.DrawSphere(globalMeshVertices[i], 0.1f);
                 if (numReflections[i] == 0) Gizmos.color = Color.white;
+            }
+        }
+        Gizmos.color = Color.green;
+        if (showMeshNormals && mapped) {
+            Vector3[] meshNormals = anamorphObject.GetComponent<MeshFilter>().sharedMesh.normals;
+            for (int i = (int) showMin; i <= showMax; i++) {
+                for (int r = 0; r < numReflections[i]; r++) {
+                    Gizmos.DrawLine(globalMeshVertices[i], globalMeshVertices[i] + meshNormals[i]);
+                }
             }
         }
         Gizmos.color = Color.white;
@@ -234,6 +252,22 @@ public class AnamorphicMapper : MonoBehaviour {
                 Gizmos.DrawSphere(mappedVertices[i], 0.1f);
             }
         }
+        Gizmos.color = Color.green;
+        if (showMappedNormals && mapped) {
+            Vector3[] mappedNormals = GetComponent<MeshFilter>().sharedMesh.normals;
+            for (int i = (int) showMin; i <= showMax; i++) {
+                for (int r = 0; r < numReflections[i]; r++) {
+                    Gizmos.DrawLine(mappedVertices[i], mappedVertices[i] + mappedNormals[i]);
+                }
+            }
+        }
+        Gizmos.color = Color.magenta;
+        if (showAdditionalReflectionDistance && mapped) {
+            for (int i = (int) showMin; i <= showMax; i++) {
+                if (numReflections[i] == 0) continue;
+                Gizmos.DrawLine(mappedVertices[i], mappedVertices[i] + reflections[i, numReflections[i] - 1]);
+            }
+        }
     }
 
     private void UpdateMaterials() {
@@ -250,7 +284,7 @@ public class AnamorphicMapper : MonoBehaviour {
                 mappedMeshRenderer.material = morphedNormalsMaterial;
                 morphedNormalsMaterial.SetInteger(NORMAL_SHADER_MODE_PROP_NAME, 1);
                 break;
-            case RenderMode.RelativeNormals:
+            case RenderMode.ObjectRelativeNormals:
                 anamorphMeshRenderer.material = normalsMaterial;
                 mappedMeshRenderer.material = morphedNormalsMaterial;
                 morphedNormalsMaterial.SetInteger(NORMAL_SHADER_MODE_PROP_NAME, 2);

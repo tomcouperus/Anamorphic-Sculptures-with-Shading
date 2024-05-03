@@ -2,7 +2,7 @@ Shader "Normals/Morphed Surface Normals"
 {
     Properties
     {
-        _Mode ("Which mode to use for showing the morphed normals. 1=Normal, 2=Relative angle. Out of range uses 1.", Integer) = 1
+        _Mode ("Which mode to use for showing the morphed normals. 1=Normal, 2=Object relative angle. Out of range uses 1.", Integer) = 1
         _RelativePlane ("Which plane to use for angle calculation. 1=XY, 2=YZ, 3=XZ. Out of range uses 1.", Integer) = 1
     }
     SubShader
@@ -29,7 +29,7 @@ Shader "Normals/Morphed Surface Normals"
             {
                 float4 vertex : POSITION;
                 float3 normal : NORMAL;
-                float3 originalNormal : TEXCOORD3;
+                float3 originalObjectNormal : TEXCOORD3;
             };
 
             // Vertex shader output / fragment shader input
@@ -37,7 +37,7 @@ Shader "Normals/Morphed Surface Normals"
             {
                 float4 vertex : SV_POSITION;
                 float3 normal : NORMAL;
-                float3 originalNormal : TEXCOORD3;
+                float3 originalObjectNormal : TEXCOORD3;
             };
 
             // Return the angle in radians between two 2D vectors
@@ -52,7 +52,7 @@ Shader "Normals/Morphed Surface Normals"
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
                 o.normal = v.normal;
-                o.originalNormal = v.originalNormal;
+                o.originalObjectNormal = v.originalObjectNormal;
                 return o;
             }
 
@@ -64,12 +64,12 @@ Shader "Normals/Morphed Surface Normals"
                 return fixed4(color.rgb, 0);
             }
 
-            // Relative mode -- fragment shader 
-            fixed4 relativeMode(v2f i)
+            // Object relative mode -- fragment shader 
+            fixed4 objectRelativeMode(v2f i)
             {
-                float angleXY = angle2(i.normal.xy, i.originalNormal.xy);
-                float angleYZ = angle2(i.normal.yz, i.originalNormal.yz);
-                float angleXZ = angle2(i.normal.xz, i.originalNormal.xz);
+                float angleXY = angle2(i.normal.xy, i.originalObjectNormal.xy);
+                float angleYZ = angle2(i.normal.yz, i.originalObjectNormal.yz);
+                float angleXZ = angle2(i.normal.xz, i.originalObjectNormal.xz);
                 fixed4 color;
                 switch (_RelativePlane) 
                 {
@@ -86,7 +86,7 @@ Shader "Normals/Morphed Surface Normals"
                 }
                 return color / PI;
             }
-            
+
             // Main fragment shader 
             fixed4 frag (v2f i) : SV_Target
             {
@@ -94,7 +94,7 @@ Shader "Normals/Morphed Surface Normals"
                 switch(_Mode)
                 {
                     case 2:
-                        return relativeMode(i);
+                        return objectRelativeMode(i);
                     case 1:
                     default:
                         return reflectedMode(i);
