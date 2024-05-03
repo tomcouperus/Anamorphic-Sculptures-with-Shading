@@ -8,7 +8,7 @@ public class AnamorphicMapper : MonoBehaviour {
 
     [Header("Settings")]
     [SerializeField]
-    private Transform viewer;
+    private Transform viewPosition;
     [SerializeField]
     private Mirror mirror;
     [SerializeField]
@@ -106,7 +106,7 @@ public class AnamorphicMapper : MonoBehaviour {
         bool allCastsHit = true;
         for (int i = 0; i < vertices.Length; i++) {
             // Initial raycast
-            Vector3 origin = viewer.position; // Use as null value, as Vector3 is not nullable
+            Vector3 origin = viewPosition.position; // Use as null value, as Vector3 is not nullable
             raycastDirections[i] = globalMeshVertices[i] - origin;
             Vector3 direction = raycastDirections[i].normalized;
 
@@ -194,7 +194,7 @@ public class AnamorphicMapper : MonoBehaviour {
     }
 
     private void OnDrawGizmosSelected() {
-        Vector3 origin = viewer.position;
+        Vector3 origin = viewPosition.position;
 
         Gizmos.color = Color.white;
         if (showMeshVertices && mapped) {
