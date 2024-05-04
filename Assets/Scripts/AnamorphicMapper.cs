@@ -224,10 +224,10 @@ public class AnamorphicMapper : MonoBehaviour {
 
             // Determine angle gamma
             Vector2 vertex = new(originalVertices[i].x, originalVertices[i].z);
-            float angleGamma = Vector2.Angle(new Vector2(1, 0), vertex - centralVertex); //TODO maybe signed dunno?
-            float angleGammaRad = angleGamma * Mathf.Deg2Rad;
+            float angle = Vector2.SignedAngle(new Vector2(1, 0), vertex - centralVertex); //TODO maybe signed dunno?
+            float angleRad = angle * Mathf.Deg2Rad;
 
-            Vector2 doublePrimeDirection = new(Mathf.Cos(-angleGammaRad), Mathf.Sin(-angleGammaRad));
+            Vector2 doublePrimeDirection = new(Mathf.Cos(-angleRad), Mathf.Sin(-angleRad));
 
             // Get the intersection point of the centralPrime to vertexDoublePrime vector with the reflection vector
             Vector2 xzMirrorHit = new(mirrorHits[i, lastReflection].x, mirrorHits[i, lastReflection].z);
@@ -237,8 +237,8 @@ public class AnamorphicMapper : MonoBehaviour {
                 Debug.LogError("Vertex " + i + " did not intersect");
                 continue;
             }
-            verticesPrime[i].x = intersection.x;
-            verticesPrime[i].z = intersection.y;
+            float gamma = (intersection.x - xzMirrorHit.x) / xzReflection.x;
+            verticesPrime[i] = mirrorHits[i, lastReflection] + reflections[i, lastReflection] * gamma;
         }
 
         mappedMesh.SetVertices(verticesPrime);
