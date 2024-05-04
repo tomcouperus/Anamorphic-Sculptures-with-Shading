@@ -26,4 +26,6 @@ public static class MathUtilities {
         intersection = point1 + a * direction1;
         return true;
     }
+
+    // Possible 3D equivalent: https://stackoverflow.com/questions/59449628/check-when-two-vector3-lines-intersect-unity3d
 }
