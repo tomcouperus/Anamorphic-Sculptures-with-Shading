@@ -13,8 +13,15 @@ public class AnamorphicMapper_Inspector : Editor {
         if (GUILayout.Button("Map")) {
             anamorphicMapper.MapObject();
         }
-        if (GUILayout.Button("Destroy")) {
-            anamorphicMapper.Clear();
+        if (anamorphicMapper.Status == AnamorphicMapper.MappingStatus.Mapped) {
+            if (GUILayout.Button("Optimize")) {
+                anamorphicMapper.Optimize();
+            }
+        }
+        if (anamorphicMapper.Status != AnamorphicMapper.MappingStatus.None) {
+            if (GUILayout.Button("Destroy")) {
+                anamorphicMapper.Clear();
+            }
         }
     }
 }
