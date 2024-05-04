@@ -7,9 +7,9 @@ public static class MathUtilities {
     /// </summary>
     /// <param name="intersection"></param>
     /// <param name="point1"></param>
-    /// <param name="direction1">Normalized direction vector</param>
+    /// <param name="direction1"></param>
     /// <param name="point2"></param>
-    /// <param name="direction2">Normalized direction vector</param>
+    /// <param name="direction2"></param>
     /// <returns></returns>
     /// https://math.stackexchange.com/questions/406864/intersection-of-two-lines-in-vector-form
     /// https://en.wikipedia.org/wiki/Cramer%27s_rule
