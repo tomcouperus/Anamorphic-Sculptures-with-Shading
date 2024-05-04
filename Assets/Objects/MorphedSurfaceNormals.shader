@@ -2,6 +2,7 @@ Shader "Normals/Morphed Surface Normals"
 {
     Properties
     {
+        _Color ("Additional color to add to the shader for better contrast", Color) = (0, 0, 0, 0)
         _Mode ("Which mode to use for showing the morphed normals. 1=Normal, 2=Object relative angle. Out of range uses 1.", Integer) = 1
         _RelativePlane ("Which plane to use for angle calculation. 1=XY, 2=YZ, 3=XZ. Out of range uses 1.", Integer) = 1
     }
@@ -21,6 +22,7 @@ Shader "Normals/Morphed Surface Normals"
             #include "UnityCG.cginc"
             #define PI 3.14159265358
 
+            fixed4 _Color;
             uniform int _Mode;
             uniform int _RelativePlane;
 
@@ -91,14 +93,19 @@ Shader "Normals/Morphed Surface Normals"
             fixed4 frag (v2f i) : SV_Target
             {
                 i.normal.z = -i.normal.z;
+                fixed4 color;
                 switch(_Mode)
                 {
                     case 2:
-                        return objectRelativeMode(i);
+                        color = objectRelativeMode(i);
+                        break;
                     case 1:
                     default:
-                        return reflectedMode(i);
+                        color = reflectedMode(i);
+                        break;
                 }
+                color = color + _Color;
+                return color;
             }
             ENDCG
         }
