@@ -62,6 +62,8 @@ public class AnamorphicMapper : MonoBehaviour {
     private Vector3[,] reflections = null;
     [SerializeField]
     private Vector3[] mappedVertices = null;
+    [SerializeField]
+    private Vector3[] optimizedVertices = null;
 
     [SerializeField]
     private bool showMeshVertices = false;
@@ -81,6 +83,8 @@ public class AnamorphicMapper : MonoBehaviour {
     private bool showMappedNormals = false;
     [SerializeField]
     private bool showAdditionalReflectionDistance = false;
+    [SerializeField]
+    private bool showOptimizedVertices = false;
 
     public float showMin = 0;
     public float showMax = 0;
@@ -217,8 +221,13 @@ public class AnamorphicMapper : MonoBehaviour {
         Debug.Log("Displacing vertices");
         Vector2 centralVertex = new(originalVertices[minAngleIndex].x, originalVertices[minAngleIndex].z);
         Vector2 centralVertexPrime = new(verticesPrime[minAngleIndex].x, verticesPrime[minAngleIndex].z);
+
+        optimizedVertices = new Vector3[originalVertices.Length];
         for (int i = 0; i < originalVertices.Length; i++) {
-            if (i == minAngleIndex) continue;
+            if (i == minAngleIndex) {
+                optimizedVertices[i] = verticesPrime[i];
+                continue;
+            }
             int lastReflection = numReflections[i] - 1;
             if (lastReflection < 0) continue;
 
@@ -238,10 +247,10 @@ public class AnamorphicMapper : MonoBehaviour {
                 continue;
             }
             float gamma = (intersection.x - xzMirrorHit.x) / xzReflection.x;
-            verticesPrime[i] = mirrorHits[i, lastReflection] + reflections[i, lastReflection] * gamma;
+            optimizedVertices[i] = mirrorHits[i, lastReflection] + reflections[i, lastReflection] * gamma;
         }
 
-        mappedMesh.SetVertices(verticesPrime);
+        mappedMesh.SetVertices(optimizedVertices);
         mappedMesh.RecalculateNormals();
         return true;
     }
@@ -259,6 +268,7 @@ public class AnamorphicMapper : MonoBehaviour {
         mirrorNormals = null;
         reflections = null;
         mappedVertices = null;
+        optimizedVertices = null;
         GetComponent<MeshFilter>().sharedMesh = null;
 
         Status = MappingStatus.None;
@@ -337,6 +347,13 @@ public class AnamorphicMapper : MonoBehaviour {
             for (int i = (int) showMin; i <= showMax; i++) {
                 if (numReflections[i] == 0) continue;
                 Gizmos.DrawLine(mappedVertices[i], mappedVertices[i] + reflections[i, numReflections[i] - 1]);
+            }
+        }
+        Gizmos.color = Color.green;
+        if (showOptimizedVertices && Status == MappingStatus.Optimized) {
+            for (int i = (int) showMin; i <= showMax; i++) {
+                if (numReflections[i] == 0) continue;
+                Gizmos.DrawSphere(optimizedVertices[i], 0.1f);
             }
         }
     }
