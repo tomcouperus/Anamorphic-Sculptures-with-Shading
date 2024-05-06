@@ -11,6 +11,7 @@ public class AnamorphicMapper_Inspector : Editor {
         EditorGUILayout.MinMaxSlider(ref anamorphicMapper.showMin, ref anamorphicMapper.showMax, anamorphicMapper.ShowMinLimit, anamorphicMapper.ShowMaxLimit);
 
         if (GUILayout.Button("Map")) {
+            anamorphicMapper.Clear();
             anamorphicMapper.MapObject();
         }
         if (anamorphicMapper.Status == AnamorphicMapper.MappingStatus.Mapped) {
