@@ -63,7 +63,11 @@ public class AnamorphicMapper : MonoBehaviour {
     [SerializeField]
     private Vector3[] mappedVertices = null;
     [SerializeField]
+    private Vector3[] mappedNormals = null;
+    [SerializeField]
     private Vector3[] optimizedVertices = null;
+    [SerializeField]
+    private Vector3[] optimizedNormals = null;
 
     [SerializeField]
     private bool showMeshVertices = false;
@@ -85,6 +89,8 @@ public class AnamorphicMapper : MonoBehaviour {
     private bool showAdditionalReflectionDistance = false;
     [SerializeField]
     private bool showOptimizedVertices = false;
+    [SerializeField]
+    private bool showOptimizedNormals = false;
 
     public float showMin = 0;
     public float showMax = 0;
@@ -182,6 +188,7 @@ public class AnamorphicMapper : MonoBehaviour {
         mappedMesh.RecalculateNormals();
         GetComponent<MeshFilter>().sharedMesh = mappedMesh;
 
+        mappedNormals = mappedMesh.normals;
         ShowMaxLimit = vertices.Length - 1;
         Status = MappingStatus.Mapped;
     }
@@ -252,6 +259,7 @@ public class AnamorphicMapper : MonoBehaviour {
 
         mappedMesh.SetVertices(optimizedVertices);
         mappedMesh.RecalculateNormals();
+        optimizedNormals = mappedMesh.normals;
         return true;
     }
 
@@ -268,7 +276,9 @@ public class AnamorphicMapper : MonoBehaviour {
         mirrorNormals = null;
         reflections = null;
         mappedVertices = null;
+        mappedNormals = null;
         optimizedVertices = null;
+        optimizedNormals = null;
         GetComponent<MeshFilter>().sharedMesh = null;
 
         Status = MappingStatus.None;
@@ -335,7 +345,6 @@ public class AnamorphicMapper : MonoBehaviour {
         }
         Gizmos.color = Color.green;
         if (showMappedNormals && Status != MappingStatus.None) {
-            Vector3[] mappedNormals = GetComponent<MeshFilter>().sharedMesh.normals;
             for (int i = (int) showMin; i <= showMax; i++) {
                 for (int r = 0; r < numReflections[i]; r++) {
                     Gizmos.DrawLine(mappedVertices[i], mappedVertices[i] + mappedNormals[i]);
@@ -349,11 +358,19 @@ public class AnamorphicMapper : MonoBehaviour {
                 Gizmos.DrawLine(mappedVertices[i], mappedVertices[i] + reflections[i, numReflections[i] - 1]);
             }
         }
-        Gizmos.color = Color.green;
+        Gizmos.color = Color.magenta;
         if (showOptimizedVertices && Status == MappingStatus.Optimized) {
             for (int i = (int) showMin; i <= showMax; i++) {
                 if (numReflections[i] == 0) continue;
                 Gizmos.DrawSphere(optimizedVertices[i], 0.1f);
+            }
+        }
+        Gizmos.color = Color.green;
+        if (showOptimizedNormals && Status != MappingStatus.None) {
+            for (int i = (int) showMin; i <= showMax; i++) {
+                for (int r = 0; r < numReflections[i]; r++) {
+                    Gizmos.DrawLine(optimizedVertices[i], optimizedVertices[i] + optimizedNormals[i]);
+                }
             }
         }
     }
