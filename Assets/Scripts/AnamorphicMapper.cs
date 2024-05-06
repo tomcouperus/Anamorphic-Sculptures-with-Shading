@@ -223,7 +223,7 @@ public class AnamorphicMapper : MonoBehaviour {
             Debug.LogError("There is no angle of incident in the xz-plane of 0 degrees.");
             return false;
         }
-        print(minAngleIndex);
+        Debug.Log("Minimum angle " + minAngle + " degrees at index " + minAngleIndex);
 
         Debug.Log("Displacing vertices");
         Vector2 centralVertex = new(originalVertices[minAngleIndex].x, originalVertices[minAngleIndex].z);
@@ -240,7 +240,7 @@ public class AnamorphicMapper : MonoBehaviour {
 
             // Determine angle gamma
             Vector2 vertex = new(originalVertices[i].x, originalVertices[i].z);
-            float angle = Vector2.SignedAngle(new Vector2(1, 0), vertex - centralVertex); //TODO maybe signed dunno?
+            float angle = Vector2.SignedAngle(new Vector2(1, 0), vertex - centralVertex);
             float angleRad = angle * Mathf.Deg2Rad;
 
             Vector2 doublePrimeDirection = new(Mathf.Cos(-angleRad), Mathf.Sin(-angleRad));
@@ -255,6 +255,10 @@ public class AnamorphicMapper : MonoBehaviour {
             }
             float gamma = (intersection.x - xzMirrorHit.x) / xzReflection.x;
             optimizedVertices[i] = mirrorHits[i, lastReflection] + reflections[i, lastReflection] * gamma;
+
+            if (float.IsNaN(optimizedVertices[i].x) || float.IsNaN(optimizedVertices[i].y) || float.IsNaN(optimizedVertices[i].z)) {
+                Debug.LogError("Optimized vertex " + i + ": " + optimizedVertices[i]);
+            }
         }
 
         mappedMesh.SetVertices(optimizedVertices);
@@ -288,7 +292,7 @@ public class AnamorphicMapper : MonoBehaviour {
         Vector3 origin = viewPosition.position;
 
         Gizmos.color = Color.white;
-        if (showMeshVertices && Status != MappingStatus.None) {
+        if (showMeshVertices && globalMeshVertices != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax; i++) {
                 if (numReflections[i] == 0) Gizmos.color = Color.red;
                 Gizmos.DrawSphere(globalMeshVertices[i], 0.1f);
@@ -296,7 +300,7 @@ public class AnamorphicMapper : MonoBehaviour {
             }
         }
         Gizmos.color = Color.green;
-        if (showMeshNormals && Status != MappingStatus.None) {
+        if (showMeshNormals && globalMeshVertices != null && Status != MappingStatus.None) {
             Vector3[] meshNormals = anamorphObject.GetComponent<MeshFilter>().sharedMesh.normals;
             for (int i = (int) showMin; i <= showMax; i++) {
                 for (int r = 0; r < numReflections[i]; r++) {
@@ -305,7 +309,7 @@ public class AnamorphicMapper : MonoBehaviour {
             }
         }
         Gizmos.color = Color.white;
-        if (showRaycastDirections && Status != MappingStatus.None) {
+        if (showRaycastDirections && raycastDirections != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax; i++) {
                 if (numReflections[i] == 0) Gizmos.color = Color.red;
                 Gizmos.DrawLine(origin, origin + raycastDirections[i]);
@@ -313,7 +317,7 @@ public class AnamorphicMapper : MonoBehaviour {
             }
         }
         Gizmos.color = Color.white;
-        if (showMirrorHits && Status != MappingStatus.None) {
+        if (showMirrorHits && mirrorHits != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax; i++) {
                 for (int r = 0; r < numReflections[i]; r++) {
                     Gizmos.DrawSphere(mirrorHits[i, r], 0.1f);
@@ -321,7 +325,7 @@ public class AnamorphicMapper : MonoBehaviour {
             }
         }
         Gizmos.color = Color.green;
-        if (showMirrorNormals && Status != MappingStatus.None) {
+        if (showMirrorNormals && mirrorHits != null && mirrorNormals != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax; i++) {
                 for (int r = 0; r < numReflections[i]; r++) {
                     Gizmos.DrawLine(mirrorHits[i, r], mirrorHits[i, r] + mirrorNormals[i, r]);
@@ -329,7 +333,7 @@ public class AnamorphicMapper : MonoBehaviour {
             }
         }
         Gizmos.color = Color.blue;
-        if (showReflections && Status != MappingStatus.None) {
+        if (showReflections && mirrorHits != null && reflections != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax; i++) {
                 for (int r = 0; r < numReflections[i]; r++) {
                     Gizmos.DrawLine(mirrorHits[i, r], mirrorHits[i, r] + reflections[i, r]);
@@ -337,14 +341,14 @@ public class AnamorphicMapper : MonoBehaviour {
             }
         }
         Gizmos.color = Color.white;
-        if (showMappedVertices && Status != MappingStatus.None) {
+        if (showMappedVertices && mappedVertices != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax; i++) {
                 if (numReflections[i] == 0) continue;
                 Gizmos.DrawSphere(mappedVertices[i], 0.1f);
             }
         }
         Gizmos.color = Color.green;
-        if (showMappedNormals && Status != MappingStatus.None) {
+        if (showMappedNormals && mappedVertices != null && mappedNormals != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax; i++) {
                 for (int r = 0; r < numReflections[i]; r++) {
                     Gizmos.DrawLine(mappedVertices[i], mappedVertices[i] + mappedNormals[i]);
@@ -352,21 +356,21 @@ public class AnamorphicMapper : MonoBehaviour {
             }
         }
         Gizmos.color = Color.magenta;
-        if (showAdditionalReflectionDistance && Status != MappingStatus.None) {
+        if (showAdditionalReflectionDistance && mappedVertices != null && reflections != null && numReflections != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax; i++) {
                 if (numReflections[i] == 0) continue;
                 Gizmos.DrawLine(mappedVertices[i], mappedVertices[i] + reflections[i, numReflections[i] - 1]);
             }
         }
         Gizmos.color = Color.magenta;
-        if (showOptimizedVertices && Status == MappingStatus.Optimized) {
+        if (showOptimizedVertices && optimizedVertices != null && Status == MappingStatus.Optimized) {
             for (int i = (int) showMin; i <= showMax; i++) {
                 if (numReflections[i] == 0) continue;
                 Gizmos.DrawSphere(optimizedVertices[i], 0.1f);
             }
         }
         Gizmos.color = Color.green;
-        if (showOptimizedNormals && Status != MappingStatus.None) {
+        if (showOptimizedNormals && optimizedVertices != null && optimizedNormals != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax; i++) {
                 for (int r = 0; r < numReflections[i]; r++) {
                     Gizmos.DrawLine(optimizedVertices[i], optimizedVertices[i] + optimizedNormals[i]);
