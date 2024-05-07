@@ -1,7 +1,9 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(MeshRenderer))]
 [RequireComponent(typeof(MeshFilter))]
+[RequireComponent(typeof(MeshCollider))]
 public class AnamorphicMapper : MonoBehaviour {
     private const string NORMAL_SHADER_MODE_PROP_NAME = "_Mode";
     private const string NORMAL_SHADER_RELATIVE_PLANE_PROP_NAME = "_RelativePlane";
@@ -48,6 +50,7 @@ public class AnamorphicMapper : MonoBehaviour {
     private RelativePlane relativePlane = RelativePlane.XZ;
 
     [Header("Debug")]
+    private const float GIZMO_SPHERE_RADIUS = 0.1f;
     [SerializeField]
     private Vector3[] globalMeshVertices = null;
     [SerializeField]
@@ -64,6 +67,8 @@ public class AnamorphicMapper : MonoBehaviour {
     private Vector3[] mappedVertices = null;
     [SerializeField]
     private Vector3[] mappedNormals = null;
+    [SerializeField]
+    private int[] occludedMappedVertexIndices = null;
     [SerializeField]
     private Vector3[] optimizedVertices = null;
     [SerializeField]
@@ -85,6 +90,8 @@ public class AnamorphicMapper : MonoBehaviour {
     private bool showMappedVertices = false;
     [SerializeField]
     private bool showMappedNormals = false;
+    [SerializeField]
+    private bool showOccludedMappedVertices = false;
     [SerializeField]
     private bool showAdditionalReflectionDistance = false;
     [SerializeField]
@@ -121,7 +128,7 @@ public class AnamorphicMapper : MonoBehaviour {
             raycastDirections[i] = globalMeshVertices[i] - origin;
             Vector3 direction = raycastDirections[i].normalized;
 
-            RaycastHit[] hits = Physics.RaycastAll(origin, direction, maxRaycastDistance);
+            RaycastHit[] hits = Physics.RaycastAll(origin, direction, maxRaycastDistance, LayerMask.GetMask("Mirror"));
 
             numReflections[i] = 0;
             if (hits.Length == 0) {
@@ -188,13 +195,21 @@ public class AnamorphicMapper : MonoBehaviour {
         mappedMesh.RecalculateNormals();
         GetComponent<MeshFilter>().sharedMesh = mappedMesh;
 
+        UpdateCollider();
+
         mappedNormals = mappedMesh.normals;
         ShowMaxLimit = vertices.Length - 1;
         Status = MappingStatus.Mapped;
     }
 
+    private void UpdateCollider() {
+        Mesh mesh = GetComponent<MeshFilter>().sharedMesh;
+        MeshCollider meshCollider = GetComponent<MeshCollider>();
+        meshCollider.sharedMesh = mesh;
+    }
+
     private bool OptimizeXZPlane() {
-        Debug.Log("Applying XZ plane optimizer. Limited to simple planes morphed by a convex mirror with a vertical curve.");
+        Debug.Log("Applying XZ plane optimizer to non-occluded vertices. Limited to simple planes morphed by a convex mirror with a vertical curve.");
 
         // Get some basic components into variables
         Mesh originalMesh = anamorphObject.GetComponent<MeshFilter>().sharedMesh;
@@ -219,11 +234,11 @@ public class AnamorphicMapper : MonoBehaviour {
             }
         }
         // Only continue if the lowest angle of incident is actually 0, and thus coincident with the camera-vertex ray.
+        Debug.Log("Minimum angle " + minAngle + " degrees at index " + minAngleIndex);
         if (minAngle != 0) {
             Debug.LogError("There is no angle of incident in the xz-plane of 0 degrees.");
             return false;
         }
-        Debug.Log("Minimum angle " + minAngle + " degrees at index " + minAngleIndex);
 
         Debug.Log("Displacing vertices");
         Vector2 centralVertex = new(originalVertices[minAngleIndex].x, originalVertices[minAngleIndex].z);
@@ -254,6 +269,7 @@ public class AnamorphicMapper : MonoBehaviour {
                 continue;
             }
             float gamma = (intersection.x - xzMirrorHit.x) / xzReflection.x;
+            // TODO improve issue for NaN errors on the x axis.
             if (float.IsNaN(gamma)) {
                 Debug.LogError("NaN error at index " + i);
                 optimizedVertices[i] = mappedVertices[i];
@@ -272,11 +288,39 @@ public class AnamorphicMapper : MonoBehaviour {
 
         mappedMesh.SetVertices(optimizedVertices);
         mappedMesh.RecalculateNormals();
+
+        UpdateCollider();
+
         optimizedNormals = mappedMesh.normals;
         return true;
     }
 
+    private bool CalculateOccludedMappedVertices(out int[] occludedIndices) {
+        if (Status == MappingStatus.None) {
+            occludedIndices = null;
+            return false;
+        }
+        List<int> occludedIndicesList = new();
+        for (int i = 0; i < mappedVertices.Length; i++) {
+            int lastReflection = numReflections[i] - 1;
+            if (lastReflection < 0) continue;
+
+            Vector3 origin = mirrorHits[i, lastReflection];
+            Vector3 direction = reflections[i, lastReflection];
+            float raycastDistance = Vector3.Distance(mappedVertices[i], origin) - 0.05f;
+            RaycastHit[] hits = Physics.RaycastAll(origin, direction, raycastDistance, LayerMask.GetMask("Mapped Object"));
+
+            if (hits.Length > 0) occludedIndicesList.Add(i);
+        }
+        occludedIndices = occludedIndicesList.ToArray();
+        return true;
+    }
+
     public void Optimize() {
+        if (!CalculateOccludedMappedVertices(out occludedMappedVertexIndices)) {
+            Debug.LogError("Error in calculating occluded mapped vertices");
+            return;
+        }
         if (!OptimizeXZPlane()) return;
         Status = MappingStatus.Optimized;
     }
@@ -290,9 +334,11 @@ public class AnamorphicMapper : MonoBehaviour {
         reflections = null;
         mappedVertices = null;
         mappedNormals = null;
+        occludedMappedVertexIndices = null;
         optimizedVertices = null;
         optimizedNormals = null;
         GetComponent<MeshFilter>().sharedMesh = null;
+        GetComponent<MeshCollider>().sharedMesh = null;
 
         Status = MappingStatus.None;
     }
@@ -304,7 +350,7 @@ public class AnamorphicMapper : MonoBehaviour {
         if (showMeshVertices && globalMeshVertices != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax && i < globalMeshVertices.Length; i++) {
                 if (numReflections[i] == 0) Gizmos.color = Color.red;
-                Gizmos.DrawSphere(globalMeshVertices[i], 0.1f);
+                Gizmos.DrawSphere(globalMeshVertices[i], GIZMO_SPHERE_RADIUS);
                 if (numReflections[i] == 0) Gizmos.color = Color.white;
             }
         }
@@ -329,7 +375,7 @@ public class AnamorphicMapper : MonoBehaviour {
         if (showMirrorHits && mirrorHits != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax && i < mirrorHits.Length; i++) {
                 for (int r = 0; r < numReflections[i]; r++) {
-                    Gizmos.DrawSphere(mirrorHits[i, r], 0.1f);
+                    Gizmos.DrawSphere(mirrorHits[i, r], GIZMO_SPHERE_RADIUS);
                 }
             }
         }
@@ -353,7 +399,7 @@ public class AnamorphicMapper : MonoBehaviour {
         if (showMappedVertices && mappedVertices != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax && i < mappedVertices.Length; i++) {
                 if (numReflections[i] == 0) continue;
-                Gizmos.DrawSphere(mappedVertices[i], 0.1f);
+                Gizmos.DrawSphere(mappedVertices[i], GIZMO_SPHERE_RADIUS);
             }
         }
         Gizmos.color = Color.green;
@@ -371,11 +417,20 @@ public class AnamorphicMapper : MonoBehaviour {
                 Gizmos.DrawLine(mappedVertices[i], mappedVertices[i] + reflections[i, numReflections[i] - 1]);
             }
         }
+        Gizmos.color = Color.blue;
+        if (showOccludedMappedVertices && occludedMappedVertexIndices != null && Status != MappingStatus.None) {
+            for (int i = 0; i < occludedMappedVertexIndices.Length; i++) {
+                int idx = occludedMappedVertexIndices[i];
+                if (idx >= showMin && idx <= showMax) {
+                    Gizmos.DrawSphere(mappedVertices[idx], GIZMO_SPHERE_RADIUS * 1.1f);
+                }
+            }
+        }
         Gizmos.color = Color.magenta;
         if (showOptimizedVertices && optimizedVertices != null && Status == MappingStatus.Optimized) {
             for (int i = (int) showMin; i <= showMax && i < optimizedVertices.Length; i++) {
                 if (numReflections[i] == 0) continue;
-                Gizmos.DrawSphere(optimizedVertices[i], 0.1f);
+                Gizmos.DrawSphere(optimizedVertices[i], GIZMO_SPHERE_RADIUS);
             }
         }
         Gizmos.color = Color.green;
