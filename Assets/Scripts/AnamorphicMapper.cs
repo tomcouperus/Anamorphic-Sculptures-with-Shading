@@ -54,6 +54,8 @@ public class AnamorphicMapper : MonoBehaviour {
     [SerializeField]
     private Vector3[] globalMeshVertices = null;
     [SerializeField]
+    private Vector3[] meshNormals = null;
+    [SerializeField]
     private Vector3[] raycastDirections = null;
     [SerializeField]
     private int[] numReflections = null;
@@ -110,9 +112,12 @@ public class AnamorphicMapper : MonoBehaviour {
         Transform anamorphTransform = anamorphObject.transform;
         Mesh anamorphMesh = anamorphObject.GetComponent<MeshFilter>().sharedMesh;
         Vector3[] vertices = anamorphMesh.vertices;
+        Vector3[] normals = anamorphMesh.normals;
         globalMeshVertices = new Vector3[vertices.Length];
+        meshNormals = new Vector3[vertices.Length];
         for (int i = 0; i < vertices.Length; i++) {
             globalMeshVertices[i] = anamorphTransform.TransformPoint(vertices[i]);
+            meshNormals[i] = anamorphTransform.rotation * normals[i];
         }
         // Do the raycasting
         raycastDirections = new Vector3[vertices.Length];
@@ -191,7 +196,7 @@ public class AnamorphicMapper : MonoBehaviour {
         mappedMesh.SetUVs(0, anamorphMesh.uv);
         // Send the original normals to the shader as uv values;
         // Using uv 3, since unity doc says that 1 and 2 can be used for various lightmaps
-        mappedMesh.SetUVs(3, anamorphMesh.normals);
+        mappedMesh.SetUVs(3, meshNormals);
         mappedMesh.RecalculateNormals();
         GetComponent<MeshFilter>().sharedMesh = mappedMesh;
 
@@ -327,6 +332,7 @@ public class AnamorphicMapper : MonoBehaviour {
 
     public void Clear() {
         globalMeshVertices = null;
+        meshNormals = null;
         raycastDirections = null;
         numReflections = null;
         mirrorHits = null;
@@ -356,7 +362,6 @@ public class AnamorphicMapper : MonoBehaviour {
         }
         Gizmos.color = Color.green;
         if (showMeshNormals && globalMeshVertices != null && Status != MappingStatus.None) {
-            Vector3[] meshNormals = anamorphObject.GetComponent<MeshFilter>().sharedMesh.normals;
             for (int i = (int) showMin; i <= showMax && i < globalMeshVertices.Length; i++) {
                 for (int r = 0; r < numReflections[i]; r++) {
                     Gizmos.DrawLine(globalMeshVertices[i], globalMeshVertices[i] + meshNormals[i]);
