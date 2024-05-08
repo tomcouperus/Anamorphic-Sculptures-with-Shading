@@ -69,8 +69,8 @@ public class AnamorphicMapper : MonoBehaviour {
     private Vector3[] mappedVertices = null;
     [SerializeField]
     private Vector3[] mappedNormals = null;
-    [SerializeField]
-    private int[] occludedMappedVertexIndices = null;
+    // [SerializeField]
+    // private int[] occludedMappedVertexIndices = null;
     [SerializeField]
     private Vector3[] optimizedVertices = null;
     [SerializeField]
@@ -92,8 +92,8 @@ public class AnamorphicMapper : MonoBehaviour {
     private bool showMappedVertices = false;
     [SerializeField]
     private bool showMappedNormals = false;
-    [SerializeField]
-    private bool showOccludedMappedVertices = false;
+    // [SerializeField]
+    // private bool showOccludedMappedVertices = false;
     [SerializeField]
     private bool showAdditionalReflectionDistance = false;
     [SerializeField]
@@ -219,7 +219,7 @@ public class AnamorphicMapper : MonoBehaviour {
         // Get some basic components into variables
         Mesh originalMesh = anamorphObject.GetComponent<MeshFilter>().sharedMesh;
         Vector3 originalRotation = anamorphObject.transform.rotation.eulerAngles;
-        print(originalRotation);
+        Debug.Log("Rotation " + originalRotation);
         Vector3[] originalVertices = originalMesh.vertices;
         Mesh mappedMesh = GetComponent<MeshFilter>().sharedMesh;
         Vector3[] verticesPrime = mappedMesh.vertices;
@@ -253,6 +253,7 @@ public class AnamorphicMapper : MonoBehaviour {
 
         optimizedVertices = new Vector3[originalVertices.Length];
         for (int i = 0; i < originalVertices.Length; i++) {
+            // If its the minimal angle, it's the central point and doesn't move
             if (i == minAngleIndex) {
                 optimizedVertices[i] = verticesPrime[i];
                 continue;
@@ -275,8 +276,10 @@ public class AnamorphicMapper : MonoBehaviour {
                 Debug.LogError("Vertex " + i + " did not intersect");
                 continue;
             }
+            // Calculate the gamma
+            // Has a bunch of checks for edge cases that haven't been fully worked out yet, just... patched.
             float gamma = (intersection.x - xzMirrorHit.x) / xzReflection.x;
-            // TODO improve issue for NaN errors on the x axis.
+            // TODO improve issue for NaN errors on the x axis. This just logs and patches it
             if (float.IsNaN(gamma)) {
                 Debug.LogError("NaN error at index " + i);
                 optimizedVertices[i] = mappedVertices[i];
@@ -309,6 +312,7 @@ public class AnamorphicMapper : MonoBehaviour {
     }
 
     private bool CalculateOccludedMappedVertices(out int[] occludedIndices) {
+        // Calculates which reflected vertices are occluded by the mesh. Ended up not all that useful, but it might be useful in some other place, dunno.
         if (Status == MappingStatus.None) {
             occludedIndices = null;
             return false;
@@ -330,10 +334,11 @@ public class AnamorphicMapper : MonoBehaviour {
     }
 
     public void Optimize() {
-        if (!CalculateOccludedMappedVertices(out occludedMappedVertexIndices)) {
-            Debug.LogError("Error in calculating occluded mapped vertices");
-            return;
-        }
+        // if (!CalculateOccludedMappedVertices(out occludedMappedVertexIndices)) {
+        //     Debug.LogError("Error in calculating occluded mapped vertices");
+        //     return;
+        // }
+        // The above turned out not useful at all
         if (!OptimizeXZPlane()) return;
         Status = MappingStatus.Optimized;
     }
@@ -348,7 +353,7 @@ public class AnamorphicMapper : MonoBehaviour {
         reflections = null;
         mappedVertices = null;
         mappedNormals = null;
-        occludedMappedVertexIndices = null;
+        // occludedMappedVertexIndices = null;
         optimizedVertices = null;
         optimizedNormals = null;
         GetComponent<MeshFilter>().sharedMesh = null;
@@ -360,6 +365,7 @@ public class AnamorphicMapper : MonoBehaviour {
     private void OnDrawGizmosSelected() {
         Vector3 origin = viewPosition.position;
 
+        // Original mesh
         Gizmos.color = Color.white;
         if (showMeshVertices && globalMeshVertices != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax && i < globalMeshVertices.Length; i++) {
@@ -368,6 +374,7 @@ public class AnamorphicMapper : MonoBehaviour {
                 if (numReflections[i] == 0) Gizmos.color = Color.white;
             }
         }
+        // Original normals
         Gizmos.color = Color.green;
         if (showMeshNormals && globalMeshVertices != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax && i < globalMeshVertices.Length; i++) {
@@ -376,6 +383,7 @@ public class AnamorphicMapper : MonoBehaviour {
                 }
             }
         }
+        // Raycast directions
         Gizmos.color = Color.white;
         if (showRaycastDirections && raycastDirections != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax && i < raycastDirections.Length; i++) {
@@ -384,6 +392,7 @@ public class AnamorphicMapper : MonoBehaviour {
                 if (numReflections[i] == 0) Gizmos.color = Color.white;
             }
         }
+        // Mirror intersections
         Gizmos.color = Color.white;
         if (showMirrorHits && mirrorHits != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax && i < mirrorHits.Length; i++) {
@@ -392,6 +401,7 @@ public class AnamorphicMapper : MonoBehaviour {
                 }
             }
         }
+        // Mirror normals
         Gizmos.color = Color.green;
         if (showMirrorNormals && mirrorHits != null && mirrorNormals != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax; i++) {
@@ -400,6 +410,7 @@ public class AnamorphicMapper : MonoBehaviour {
                 }
             }
         }
+        // Reflections
         Gizmos.color = Color.blue;
         if (showReflections && mirrorHits != null && reflections != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax && i < reflections.Length; i++) {
@@ -408,6 +419,7 @@ public class AnamorphicMapper : MonoBehaviour {
                 }
             }
         }
+        // Mapped vertices
         Gizmos.color = Color.white;
         if (showMappedVertices && mappedVertices != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax && i < mappedVertices.Length; i++) {
@@ -415,6 +427,7 @@ public class AnamorphicMapper : MonoBehaviour {
                 Gizmos.DrawSphere(mappedVertices[i], GIZMO_SPHERE_RADIUS);
             }
         }
+        // Normals of mapped vertices
         Gizmos.color = Color.green;
         if (showMappedNormals && mappedVertices != null && mappedNormals != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax && i < mappedVertices.Length; i++) {
@@ -423,6 +436,7 @@ public class AnamorphicMapper : MonoBehaviour {
                 }
             }
         }
+        // Additional reflection length
         Gizmos.color = Color.magenta;
         if (showAdditionalReflectionDistance && mappedVertices != null && reflections != null && numReflections != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax && i < mappedVertices.Length; i++) {
@@ -430,15 +444,17 @@ public class AnamorphicMapper : MonoBehaviour {
                 Gizmos.DrawLine(mappedVertices[i], mappedVertices[i] + reflections[i, numReflections[i] - 1]);
             }
         }
-        Gizmos.color = Color.blue;
-        if (showOccludedMappedVertices && occludedMappedVertexIndices != null && Status != MappingStatus.None) {
-            for (int i = 0; i < occludedMappedVertexIndices.Length; i++) {
-                int idx = occludedMappedVertexIndices[i];
-                if (idx >= showMin && idx <= showMax) {
-                    Gizmos.DrawSphere(mappedVertices[idx], GIZMO_SPHERE_RADIUS * 1.1f);
-                }
-            }
-        }
+        // Occluded vertices. Not really used though
+        // Gizmos.color = Color.blue;
+        // if (showOccludedMappedVertices && occludedMappedVertexIndices != null && Status != MappingStatus.None) {
+        //     for (int i = 0; i < occludedMappedVertexIndices.Length; i++) {
+        //         int idx = occludedMappedVertexIndices[i];
+        //         if (idx >= showMin && idx <= showMax) {
+        //             Gizmos.DrawSphere(mappedVertices[idx], GIZMO_SPHERE_RADIUS * 1.1f);
+        //         }
+        //     }
+        // }
+        // Mapped vertices after optimization
         Gizmos.color = Color.magenta;
         if (showOptimizedVertices && optimizedVertices != null && Status == MappingStatus.Optimized) {
             for (int i = (int) showMin; i <= showMax && i < optimizedVertices.Length; i++) {
@@ -446,6 +462,7 @@ public class AnamorphicMapper : MonoBehaviour {
                 Gizmos.DrawSphere(optimizedVertices[i], GIZMO_SPHERE_RADIUS);
             }
         }
+        // Normals of mapped vertices after optimization
         Gizmos.color = Color.green;
         if (showOptimizedNormals && optimizedVertices != null && optimizedNormals != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax && i < optimizedVertices.Length; i++) {
