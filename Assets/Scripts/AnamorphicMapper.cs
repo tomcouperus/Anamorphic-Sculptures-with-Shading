@@ -214,7 +214,7 @@ public class AnamorphicMapper : MonoBehaviour {
     }
 
     private bool OptimizeXZPlane() {
-        Debug.Log("Applying XZ plane optimizer to non-occluded vertices. Limited to simple planes morphed by a convex mirror with a vertical curve.");
+        Debug.Log("Applying XZ plane optimizer. Limited to simple planes morphed by a convex mirror with a vertical curve.");
 
         // Get some basic components into variables
         Mesh originalMesh = anamorphObject.GetComponent<MeshFilter>().sharedMesh;
