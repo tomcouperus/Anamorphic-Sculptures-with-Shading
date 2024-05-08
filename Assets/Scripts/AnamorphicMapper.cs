@@ -287,6 +287,12 @@ public class AnamorphicMapper : MonoBehaviour {
                 Debug.LogWarning("Gamma Denominator z: " + xzReflection.y);
             } else {
                 optimizedVertices[i] = mirrorHits[i, lastReflection] + reflections[i, lastReflection] * gamma;
+                if (gamma > 3 || gamma < 0.4f) {
+                    Debug.LogError("Index " + i + " has abnormal gamma: " + gamma);
+                    Debug.LogWarning("Gamma x: " + gamma);
+                    Debug.LogWarning("Gamma Nominator x: " + (intersection.x - xzMirrorHit.x));
+                    Debug.LogWarning("Gamma Denominator x: " + xzReflection.x);
+                }
             }
 
         }
