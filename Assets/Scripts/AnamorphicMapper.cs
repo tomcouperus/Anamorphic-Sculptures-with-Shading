@@ -218,6 +218,8 @@ public class AnamorphicMapper : MonoBehaviour {
 
         // Get some basic components into variables
         Mesh originalMesh = anamorphObject.GetComponent<MeshFilter>().sharedMesh;
+        Vector3 originalRotation = anamorphObject.transform.rotation.eulerAngles;
+        print(originalRotation);
         Vector3[] originalVertices = originalMesh.vertices;
         Mesh mappedMesh = GetComponent<MeshFilter>().sharedMesh;
         Vector3[] verticesPrime = mappedMesh.vertices;
@@ -260,7 +262,7 @@ public class AnamorphicMapper : MonoBehaviour {
 
             // Determine angle gamma
             Vector2 vertex = new(originalVertices[i].x, originalVertices[i].z);
-            float angle = Vector2.SignedAngle(new Vector2(1, 0), vertex - centralVertex);
+            float angle = Vector2.SignedAngle(new Vector2(Mathf.Cos(originalRotation.y * Mathf.Deg2Rad), Mathf.Sin(originalRotation.y * Mathf.Deg2Rad)), vertex - centralVertex);
             float angleRad = angle * Mathf.Deg2Rad;
 
             Vector2 doublePrimeDirection = new(Mathf.Cos(-angleRad), Mathf.Sin(-angleRad));
