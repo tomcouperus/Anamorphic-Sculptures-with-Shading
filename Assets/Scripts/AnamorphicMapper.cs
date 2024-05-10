@@ -35,7 +35,7 @@ public class AnamorphicMapper : MonoBehaviour {
     public MappingStatus Status { get; private set; } = MappingStatus.None;
 
     private enum RenderMode { Texture, Normals, ObjectRelativeNormals };
-    private enum RelativePlane { XY, YZ, XZ };
+    private enum RelativeMode { XYPlane, YZPlane, XZPlane, Total };
     [Header("Rendering")]
     [SerializeField]
     private Material objectMaterial;
@@ -47,7 +47,7 @@ public class AnamorphicMapper : MonoBehaviour {
     private RenderMode renderMode = RenderMode.Texture;
     [SerializeField]
     [Tooltip("In render mode 'Relative' this determines the plane in which the angle is calculated.")]
-    private RelativePlane relativePlane = RelativePlane.XZ;
+    private RelativeMode relativeMode = RelativeMode.XZPlane;
 
     [Header("Debug")]
     private const float GIZMO_SPHERE_RADIUS = 0.1f;
@@ -497,17 +497,7 @@ public class AnamorphicMapper : MonoBehaviour {
 
     private void UpdateShaderRelativePlane() {
         if (morphedNormalsMaterial == null) return;
-        switch (relativePlane) {
-            case RelativePlane.XY:
-                morphedNormalsMaterial.SetInteger(NORMAL_SHADER_RELATIVE_PLANE_PROP_NAME, 1);
-                break;
-            case RelativePlane.YZ:
-                morphedNormalsMaterial.SetInteger(NORMAL_SHADER_RELATIVE_PLANE_PROP_NAME, 2);
-                break;
-            case RelativePlane.XZ:
-                morphedNormalsMaterial.SetInteger(NORMAL_SHADER_RELATIVE_PLANE_PROP_NAME, 3);
-                break;
-        }
+        morphedNormalsMaterial.SetInteger(NORMAL_SHADER_RELATIVE_PLANE_PROP_NAME, (int) relativeMode + 1);
     }
 
     private void OnValidate() {

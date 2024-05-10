@@ -4,7 +4,7 @@ Shader "Normals/Morphed Surface Normals"
     {
         _Color ("Additional color to add to the shader for better contrast", Color) = (0, 0, 0, 0)
         _Mode ("Which mode to use for showing the morphed normals. 1=Normal, 2=Object relative angle. Out of range uses 1.", Integer) = 1
-        _RelativePlane ("Which plane to use for angle calculation. 1=XY, 2=YZ, 3=XZ. Out of range uses 1.", Integer) = 1
+        _RelativePlane ("Which plane to use for angle calculation. 1=XY, 2=YZ, 3=XZ, 4=Total. Out of range uses 1.", Integer) = 1
     }
     SubShader
     {
@@ -47,6 +47,12 @@ Shader "Normals/Morphed Surface Normals"
             {
                 return acos(dot(a,b) / (length(a) * length(b)));
             }
+            
+            // Return the angle in radians between two 3D vectors
+            float angle3(float3 a, float3 b)
+            {
+                return acos(dot(a,b) / (length(a) * length(b)));
+            }
 
             // Vertex shader
             v2f vert (appdata v)
@@ -72,9 +78,13 @@ Shader "Normals/Morphed Surface Normals"
                 float angleXY = angle2(i.normal.xy, i.originalObjectNormal.xy);
                 float angleYZ = angle2(i.normal.yz, i.originalObjectNormal.yz);
                 float angleXZ = angle2(i.normal.xz, i.originalObjectNormal.xz);
+                float angle = angle3(i.normal, i.originalObjectNormal);
                 fixed4 color;
                 switch (_RelativePlane) 
                 {
+                    case 4:
+                        color = fixed4(angle, angle, angle, 0);
+                        break;
                     case 3:
                         color = fixed4(angleXZ, angleXZ, angleXZ, 0);
                         break;
@@ -92,6 +102,8 @@ Shader "Normals/Morphed Surface Normals"
             // Main fragment shader 
             fixed4 frag (v2f i) : SV_Target
             {
+                // i.normal.x = -i.normal.x;
+                // i.normal.y = -i.normal.y;
                 i.normal.z = -i.normal.z;
                 fixed4 color;
                 switch(_Mode)
