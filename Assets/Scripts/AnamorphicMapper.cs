@@ -8,6 +8,8 @@ public class AnamorphicMapper : MonoBehaviour {
     private const string NORMAL_SHADER_MODE_PROP_NAME = "_Mode";
     private const string NORMAL_SHADER_RELATIVE_PLANE_PROP_NAME = "_RelativePlane";
 
+    private enum OptimizerMode { XZPlane, TriangleNormals }
+
     [Header("Settings")]
     [SerializeField]
     private Transform viewPosition;
@@ -30,6 +32,8 @@ public class AnamorphicMapper : MonoBehaviour {
     [Min(0.00001f)]
     [Tooltip("Linearly scales the distance between mirror and mapped vertices.")]
     private float scale = 1.0f;
+    [SerializeField]
+    private OptimizerMode optimizer = OptimizerMode.TriangleNormals;
 
     public enum MappingStatus { None, Mapped, Optimized };
     public MappingStatus Status { get; private set; } = MappingStatus.None;
@@ -333,13 +337,28 @@ public class AnamorphicMapper : MonoBehaviour {
         return true;
     }
 
+    private bool OptimizeTriangleNormals() {
+        Debug.Log("Applying triangle normals optimizer. Limited to objects morphed by a convex mirror. Possible to work on more, but that is unverified.");
+        return true;
+    }
+
     public void Optimize() {
         // if (!CalculateOccludedMappedVertices(out occludedMappedVertexIndices)) {
         //     Debug.LogError("Error in calculating occluded mapped vertices");
         //     return;
         // }
         // The above turned out not useful at all
-        if (!OptimizeXZPlane()) return;
+        switch (optimizer) {
+            case OptimizerMode.XZPlane:
+                if (!OptimizeXZPlane()) return;
+                break;
+            case OptimizerMode.TriangleNormals:
+                if (!OptimizeTriangleNormals()) return;
+                break;
+            default:
+                Debug.LogError("Optimization mode not implemented.");
+                break;
+        }
         Status = MappingStatus.Optimized;
     }
 
