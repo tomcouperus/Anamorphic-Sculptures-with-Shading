@@ -59,7 +59,7 @@ Material:
     m_Ints:
     - _Mode: 2
     - _RelativeMode: 3
-    - _RelativePlane: 1
+    - _RelativePlane: 4
     m_Floats:
     - _BumpScale: 1
     - _Cutoff: 0.5

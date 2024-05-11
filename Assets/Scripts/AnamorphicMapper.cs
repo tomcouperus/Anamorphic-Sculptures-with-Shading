@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -16,7 +17,10 @@ public class AnamorphicMapper : MonoBehaviour {
     [SerializeField]
     private Mirror mirror;
     [SerializeField]
-    private GameObject anamorphObject;
+    private GameObject originalObject;
+    [SerializeField]
+    [Tooltip("If set to true, will average the normals at vertices that are duplicated for UV or other purposes, treating the mesh as continuous. E.g. the default Unity sphere needs this set to true, while a cube want this set to false.")]
+    private bool originalMeshIsContinuous = false;
     [SerializeField]
     [Range(0, 100)]
     private float maxRaycastDistance = 20f;
@@ -113,15 +117,15 @@ public class AnamorphicMapper : MonoBehaviour {
     public void MapObject() {
         Debug.Log("Calculating anamorphic object mapping.");
         // Transform all vertices of target mesh to global space.
-        Transform anamorphTransform = anamorphObject.transform;
-        Mesh anamorphMesh = anamorphObject.GetComponent<MeshFilter>().sharedMesh;
-        Vector3[] vertices = anamorphMesh.vertices;
-        Vector3[] normals = anamorphMesh.normals;
+        Transform originalTransform = originalObject.transform;
+        Mesh originalMesh = originalObject.GetComponent<MeshFilter>().sharedMesh;
+        Vector3[] vertices = originalMesh.vertices;
+        Vector3[] normals = originalMesh.normals;
         globalMeshVertices = new Vector3[vertices.Length];
         meshNormals = new Vector3[vertices.Length];
         for (int i = 0; i < vertices.Length; i++) {
-            globalMeshVertices[i] = anamorphTransform.TransformPoint(vertices[i]);
-            meshNormals[i] = anamorphTransform.rotation * normals[i];
+            globalMeshVertices[i] = originalTransform.TransformPoint(vertices[i]);
+            meshNormals[i] = originalTransform.rotation * normals[i];
         }
         // Do the raycasting
         raycastDirections = new Vector3[vertices.Length];
@@ -188,20 +192,21 @@ public class AnamorphicMapper : MonoBehaviour {
             if (lastReflection < 0) continue;
             mappedVertices[i] = mirrorHits[i, lastReflection] + reflections[i, lastReflection] * scale;
         }
-        int[] mappedTriangles = new int[anamorphMesh.triangles.Length];
+        int[] mappedTriangles = new int[originalMesh.triangles.Length];
         for (int i = 0; i < mappedTriangles.Length; i += 3) {
-            mappedTriangles[i] = anamorphMesh.triangles[i + 2];
-            mappedTriangles[i + 1] = anamorphMesh.triangles[i + 1];
-            mappedTriangles[i + 2] = anamorphMesh.triangles[i];
+            mappedTriangles[i] = originalMesh.triangles[i + 2];
+            mappedTriangles[i + 1] = originalMesh.triangles[i + 1];
+            mappedTriangles[i + 2] = originalMesh.triangles[i];
         }
 
         mappedMesh.SetVertices(mappedVertices);
         mappedMesh.SetTriangles(mappedTriangles, 0);
-        mappedMesh.SetUVs(0, anamorphMesh.uv);
+        mappedMesh.SetUVs(0, originalMesh.uv);
         // Send the original normals to the shader as uv values;
         // Using uv 3, since unity doc says that 1 and 2 can be used for various lightmaps
         mappedMesh.SetUVs(3, meshNormals);
-        mappedMesh.RecalculateNormals();
+        RecalculateNormals(mappedMesh, vertices);
+
         GetComponent<MeshFilter>().sharedMesh = mappedMesh;
 
         UpdateCollider();
@@ -209,6 +214,42 @@ public class AnamorphicMapper : MonoBehaviour {
         mappedNormals = mappedMesh.normals;
         ShowMaxLimit = vertices.Length - 1;
         Status = MappingStatus.Mapped;
+    }
+
+    /// <summary>
+    /// Recalculates the normals of the mapped mesh. 
+    /// If the vertices of the original object have duplicates at the same position for UV reasons but are still supposed to form a continuous surface, such as a cube-sphere, this method will account for that.
+    /// </summary>
+    /// <param name="mappedMesh">Mesh of which the normals are to be calculated</param>
+    /// <param name="vertices">Original object's vertices</param>
+    private void RecalculateNormals(Mesh mappedMesh, Vector3[] vertices) {
+        // Recalculate the normals. 
+        // If the original mesh is flagged as continuous, average the normals at those vertices that share positions with other vertices.
+        mappedMesh.RecalculateNormals();
+        if (originalMeshIsContinuous) {
+            Vector3[] mappedNormals = mappedMesh.normals;
+            // First group the vertices by position
+            Dictionary<Vector3, List<int>> positionVertexMap = new();
+            for (int i = 0; i < vertices.Length; i++) {
+                Vector3 position = vertices[i];
+                if (!positionVertexMap.ContainsKey(position)) {
+                    positionVertexMap.Add(position, new List<int>());
+                }
+                positionVertexMap[position].Add(i);
+            }
+            // Iterate over each position's indices and add the normals together to form a continuous surface.
+            foreach (List<int> indices in positionVertexMap.Values) {
+                Vector3 totalNormal = Vector3.zero;
+                foreach (int i in indices) {
+                    totalNormal += mappedNormals[i];
+                }
+                totalNormal.Normalize();
+                foreach (int i in indices) {
+                    mappedNormals[i] = totalNormal;
+                }
+            }
+            mappedMesh.SetNormals(mappedNormals);
+        }
     }
 
     private void UpdateCollider() {
@@ -221,8 +262,8 @@ public class AnamorphicMapper : MonoBehaviour {
         Debug.Log("Applying XZ plane optimizer. Limited to simple planes morphed by a convex mirror with a vertical curve.");
 
         // Get some basic components into variables
-        Mesh originalMesh = anamorphObject.GetComponent<MeshFilter>().sharedMesh;
-        Vector3 originalRotation = anamorphObject.transform.rotation.eulerAngles;
+        Mesh originalMesh = originalObject.GetComponent<MeshFilter>().sharedMesh;
+        Vector3 originalRotation = originalObject.transform.rotation.eulerAngles;
         Debug.Log("Rotation " + originalRotation);
         Vector3[] originalVertices = originalMesh.vertices;
         Mesh mappedMesh = GetComponent<MeshFilter>().sharedMesh;
@@ -339,6 +380,33 @@ public class AnamorphicMapper : MonoBehaviour {
 
     private bool OptimizeTriangleNormals() {
         Debug.Log("Applying triangle normals optimizer. Limited to objects morphed by a convex mirror. Possible to work on more, but that is unverified.");
+
+        // Just get some values into vars
+        Mesh originalMesh = originalObject.GetComponent<MeshFilter>().sharedMesh;
+        Mesh mappedMesh = GetComponent<MeshFilter>().sharedMesh;
+        Vector3[] vertices = originalMesh.vertices;
+        Vector3[] normals = originalMesh.normals;
+        int[] triangles = originalMesh.triangles;
+        Vector3[] mappedVertices = mappedMesh.vertices;
+        Vector3[] mappedNormals = mappedMesh.normals;
+
+        HashSet<Vector3> verticesSet = new(vertices);
+        print(verticesSet.Count);
+
+        return true;
+
+        float minAngle = float.PositiveInfinity;
+        int minAngleIndex = -1;
+        // Find minimum angle
+        for (int i = 0; i < vertices.Length; i++) {
+            float angle = Vector3.Angle(normals[i], mappedNormals[i]);
+            if (angle < minAngle) {
+                minAngle = angle;
+                minAngleIndex = i;
+            }
+        }
+        print("Minimum angle " + minAngle + " at index " + minAngleIndex);
+
         return true;
     }
 
@@ -493,8 +561,8 @@ public class AnamorphicMapper : MonoBehaviour {
     }
 
     private void UpdateMaterials() {
-        if (anamorphObject == null) return;
-        MeshRenderer anamorphMeshRenderer = anamorphObject.GetComponent<MeshRenderer>();
+        if (originalObject == null) return;
+        MeshRenderer anamorphMeshRenderer = originalObject.GetComponent<MeshRenderer>();
         MeshRenderer mappedMeshRenderer = GetComponent<MeshRenderer>();
         switch (renderMode) {
             case RenderMode.Texture:
