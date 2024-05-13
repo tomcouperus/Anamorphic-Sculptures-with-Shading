@@ -485,7 +485,7 @@ public class AnamorphicMapper : MonoBehaviour {
         }
         // Rotate all triangle relative to this initial triangle
         for (int i = 0; i < meshTriangleNormals.Length; i++) {
-            Vector3 rotation = Quaternion.FromToRotation(meshTriangleNormals[initialTriangleIndex], meshTriangleNormals[i]).eulerAngles;
+            Vector3 rotation = -Quaternion.FromToRotation(meshTriangleNormals[initialTriangleIndex], meshTriangleNormals[i]).eulerAngles;
             optimizedTriangleNormals[i] = Quaternion.Euler(rotation.x, rotation.y, rotation.z) * mappedTriangleNormals[initialTriangleIndex];
         }
         // return true;
@@ -529,7 +529,7 @@ public class AnamorphicMapper : MonoBehaviour {
         foreach ((int sv, int t, int v) in placeableVertices) {
             print("(" + sv + ", " + t + ", " + v + ")");
         }
-        return true;
+
         // Place vertices until no more are left
         int maxIterations = triangles.Length;
         int iter = 0;
