@@ -474,11 +474,19 @@ public class AnamorphicMapper : MonoBehaviour {
 
         // Find a rotation to base the other triangles on.
         // TODO improve selection routine. Currently just picks the first triangle, while there are probably more optimal choices. Or maybe just run an exhaustive search to minimize bounding box? Would likely require running everything below here N times.
-        int initialTriangleIndex = 0;
+        int initialTriangleIndex = -1;
+        float maxZ = float.NegativeInfinity;
+        for (int i = 0; i < mappedTriangleNormals.Length; i++) {
+            float z = mappedTriangleNormals[i].z;
+            if (z > maxZ) {
+                maxZ = z;
+                initialTriangleIndex = i;
+            }
+        }
         // Rotate all triangle relative to this initial triangle
         for (int i = 0; i < meshTriangleNormals.Length; i++) {
             Vector3 rotation = Quaternion.FromToRotation(meshTriangleNormals[initialTriangleIndex], meshTriangleNormals[i]).eulerAngles;
-            optimizedTriangleNormals[i] = Quaternion.Euler(rotation.x, -rotation.y, rotation.z) * mappedTriangleNormals[initialTriangleIndex];
+            optimizedTriangleNormals[i] = Quaternion.Euler(rotation.x, rotation.y, rotation.z) * mappedTriangleNormals[initialTriangleIndex];
         }
         // return true;
         // Map which vertices are part of which triangles
@@ -521,7 +529,7 @@ public class AnamorphicMapper : MonoBehaviour {
         foreach ((int sv, int t, int v) in placeableVertices) {
             print("(" + sv + ", " + t + ", " + v + ")");
         }
-
+        return true;
         // Place vertices until no more are left
         int maxIterations = triangles.Length;
         int iter = 0;
