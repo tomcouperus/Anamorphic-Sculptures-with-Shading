@@ -67,6 +67,7 @@ Shader "Normals/Morphed Surface Normals"
             // Reflected mode -- fragment shader
             fixed4 reflectedMode(v2f i)
             {
+                i.normal.z = -i.normal.z;
                 float3 normal = normalize(i.normal);
                 float3 color = (normal + 1) * 0.5;
                 return fixed4(color.rgb, 0);
@@ -75,6 +76,7 @@ Shader "Normals/Morphed Surface Normals"
             // Object relative mode -- fragment shader 
             fixed4 objectRelativeMode(v2f i)
             {
+                i.normal.z = -i.normal.z;
                 float angleXY = angle2(i.normal.xy, i.originalObjectNormal.xy);
                 float angleYZ = angle2(i.normal.yz, i.originalObjectNormal.yz);
                 float angleXZ = angle2(i.normal.xz, i.originalObjectNormal.xz);
@@ -102,9 +104,6 @@ Shader "Normals/Morphed Surface Normals"
             // Main fragment shader 
             fixed4 frag (v2f i) : SV_Target
             {
-                // i.normal.x = -i.normal.x;
-                // i.normal.y = -i.normal.y;
-                i.normal.z = -i.normal.z;
                 fixed4 color;
                 switch(_Mode)
                 {

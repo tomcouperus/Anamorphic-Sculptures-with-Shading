@@ -1,5 +1,6 @@
-using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using Unity.VisualScripting;
 using UnityEngine;
 
 [RequireComponent(typeof(MeshRenderer))]
@@ -17,7 +18,9 @@ public class AnamorphicMapper : MonoBehaviour {
     [SerializeField]
     private Mirror mirror;
     [SerializeField]
-    private GameObject originalObject;
+    private MappableObject[] originalObjects;
+    [SerializeField]
+    private int originalObjectIndex = 0;
     [SerializeField]
     [Tooltip("If set to true, will average the normals at vertices that are duplicated for UV or other purposes, treating the mesh as continuous. E.g. the default Unity sphere needs this set to true, while a cube want this set to false.")]
     private bool originalMeshIsContinuous = false;
@@ -64,6 +67,10 @@ public class AnamorphicMapper : MonoBehaviour {
     [SerializeField]
     private Vector3[] meshNormals = null;
     [SerializeField]
+    private Vector3[] meshTrianglePositions = null;
+    [SerializeField]
+    private Vector3[] meshTriangleNormals = null;
+    [SerializeField]
     private Vector3[] raycastDirections = null;
     [SerializeField]
     private int[] numReflections = null;
@@ -77,6 +84,10 @@ public class AnamorphicMapper : MonoBehaviour {
     private Vector3[] mappedVertices = null;
     [SerializeField]
     private Vector3[] mappedNormals = null;
+    [SerializeField]
+    private Vector3[] mappedTrianglePositions = null;
+    [SerializeField]
+    private Vector3[] mappedTriangleNormals = null;
     // [SerializeField]
     // private int[] occludedMappedVertexIndices = null;
     [SerializeField]
@@ -89,6 +100,8 @@ public class AnamorphicMapper : MonoBehaviour {
     [SerializeField]
     private bool showMeshNormals = false;
     [SerializeField]
+    private bool showMeshTriangleNormals = false;
+    [SerializeField]
     private bool showRaycastDirections = false;
     [SerializeField]
     private bool showMirrorHits = false;
@@ -97,13 +110,15 @@ public class AnamorphicMapper : MonoBehaviour {
     [SerializeField]
     private bool showReflections = false;
     [SerializeField]
+    private float reflectionDistance = 1;
+    [SerializeField]
     private bool showMappedVertices = false;
     [SerializeField]
     private bool showMappedNormals = false;
+    [SerializeField]
+    private bool showMappedTriangleNormals = false;
     // [SerializeField]
     // private bool showOccludedMappedVertices = false;
-    [SerializeField]
-    private bool showAdditionalReflectionDistance = false;
     [SerializeField]
     private bool showOptimizedVertices = false;
     [SerializeField]
@@ -117,6 +132,7 @@ public class AnamorphicMapper : MonoBehaviour {
     public void MapObject() {
         Debug.Log("Calculating anamorphic object mapping.");
         // Transform all vertices of target mesh to global space.
+        MappableObject originalObject = originalObjects[originalObjectIndex];
         Transform originalTransform = originalObject.transform;
         Mesh originalMesh = originalObject.GetComponent<MeshFilter>().sharedMesh;
         Vector3[] vertices = originalMesh.vertices;
@@ -211,7 +227,15 @@ public class AnamorphicMapper : MonoBehaviour {
 
         UpdateCollider();
 
+        // Update last bits of debug gizmo variables
         mappedNormals = mappedMesh.normals;
+        meshTrianglePositions = CalculateTrianglePositions(vertices, originalMesh.triangles);
+        meshTriangleNormals = CalculateTriangleNormals(vertices, originalMesh.triangles);
+        mappedTrianglePositions = CalculateTrianglePositions(mappedVertices, originalMesh.triangles);
+        mappedTriangleNormals = CalculateTriangleNormals(mappedVertices, originalMesh.triangles);
+        for (int i = 0; i < mappedTriangleNormals.Length; i++) {
+            mappedTriangleNormals[i] *= -1;
+        }
         ShowMaxLimit = vertices.Length - 1;
         Status = MappingStatus.Mapped;
     }
@@ -229,14 +253,7 @@ public class AnamorphicMapper : MonoBehaviour {
         if (originalMeshIsContinuous) {
             Vector3[] mappedNormals = mappedMesh.normals;
             // First group the vertices by position
-            Dictionary<Vector3, List<int>> positionVertexMap = new();
-            for (int i = 0; i < vertices.Length; i++) {
-                Vector3 position = vertices[i];
-                if (!positionVertexMap.ContainsKey(position)) {
-                    positionVertexMap.Add(position, new List<int>());
-                }
-                positionVertexMap[position].Add(i);
-            }
+            Dictionary<Vector3, List<int>> positionVertexMap = GroupDuplicateVerticesByPosition(vertices);
             // Iterate over each position's indices and add the normals together to form a continuous surface.
             foreach (List<int> indices in positionVertexMap.Values) {
                 Vector3 totalNormal = Vector3.zero;
@@ -252,6 +269,18 @@ public class AnamorphicMapper : MonoBehaviour {
         }
     }
 
+    private Dictionary<Vector3, List<int>> GroupDuplicateVerticesByPosition(Vector3[] vertices) {
+        Dictionary<Vector3, List<int>> positionVertexMap = new();
+        for (int i = 0; i < vertices.Length; i++) {
+            Vector3 position = vertices[i];
+            if (!positionVertexMap.ContainsKey(position)) {
+                positionVertexMap.Add(position, new List<int>());
+            }
+            positionVertexMap[position].Add(i);
+        }
+        return positionVertexMap;
+    }
+
     private void UpdateCollider() {
         Mesh mesh = GetComponent<MeshFilter>().sharedMesh;
         MeshCollider meshCollider = GetComponent<MeshCollider>();
@@ -262,8 +291,8 @@ public class AnamorphicMapper : MonoBehaviour {
         Debug.Log("Applying XZ plane optimizer. Limited to simple planes morphed by a convex mirror with a vertical curve.");
 
         // Get some basic components into variables
-        Mesh originalMesh = originalObject.GetComponent<MeshFilter>().sharedMesh;
-        Vector3 originalRotation = originalObject.transform.rotation.eulerAngles;
+        Mesh originalMesh = originalObjects[originalObjectIndex].GetComponent<MeshFilter>().sharedMesh;
+        Vector3 originalRotation = originalObjects[originalObjectIndex].transform.rotation.eulerAngles;
         Debug.Log("Rotation " + originalRotation);
         Vector3[] originalVertices = originalMesh.vertices;
         Mesh mappedMesh = GetComponent<MeshFilter>().sharedMesh;
@@ -348,7 +377,7 @@ public class AnamorphicMapper : MonoBehaviour {
         }
 
         mappedMesh.SetVertices(optimizedVertices);
-        mappedMesh.RecalculateNormals();
+        RecalculateNormals(mappedMesh, originalVertices);
 
         UpdateCollider();
 
@@ -378,11 +407,60 @@ public class AnamorphicMapper : MonoBehaviour {
         return true;
     }
 
+    private Vector3[] CalculateTrianglePositions(Vector3[] vertices, int[] triangles) {
+        Vector3[] trianglePositions = new Vector3[triangles.Length / 3];
+        for (int i = 0; i < trianglePositions.Length; i++) {
+            Vector3 a = vertices[triangles[3 * i]];
+            Vector3 b = vertices[triangles[3 * i + 1]];
+            Vector3 c = vertices[triangles[3 * i + 2]];
+            trianglePositions[i] = (a + b + c) / 3;
+        }
+        return trianglePositions;
+    }
+
+    private Vector3[] CalculateTriangleNormals(Vector3[] vertices, int[] triangles) {
+        Vector3[] triangleNormals = new Vector3[triangles.Length / 3];
+        for (int i = 0; i < triangles.Length / 3; i++) {
+            Vector3 a = vertices[triangles[3 * i]];
+            Vector3 b = vertices[triangles[3 * i + 1]];
+            Vector3 c = vertices[triangles[3 * i + 2]];
+
+            triangleNormals[i] = Vector3.Cross(b - a, c - a).normalized;
+        }
+        return triangleNormals;
+    }
+
+    /// <summary>
+    /// Creates a map to see which vertex is part of which triangles.
+    /// The key of the map is the vertex index. These are mapped to a set of triangle indices.
+    /// </summary>
+    /// <param name="triangles"></param>
+    /// <param name="vertexCount"></param>
+    /// <returns></returns>
+    private Dictionary<int, HashSet<int>> CreateVertexTriangleMap(int[] triangles, int vertexCount) {
+        // First initialize the vertex to triangle mapping
+        Dictionary<int, HashSet<int>> vertexTriangleMap = new();
+        for (int i = 0; i < vertexCount; i++) {
+            vertexTriangleMap.Add(i, new HashSet<int>());
+        }
+        // Then iterate over all the triangles, and add the triangle to the relevant vertex in the map
+        for (int i = 0; i < triangles.Length / 3; i++) {
+            vertexTriangleMap[triangles[3 * i]].Add(i);
+            vertexTriangleMap[triangles[3 * i + 1]].Add(i);
+            vertexTriangleMap[triangles[3 * i + 2]].Add(i);
+        }
+        return vertexTriangleMap;
+    }
+
     private bool OptimizeTriangleNormals() {
         Debug.Log("Applying triangle normals optimizer. Limited to objects morphed by a convex mirror. Possible to work on more, but that is unverified.");
+        if (!originalMeshIsContinuous) {
+            Debug.LogError("This method only works on continuous meshes. For now, at least");
+            return false;
+        }
 
         // Just get some values into vars
-        Mesh originalMesh = originalObject.GetComponent<MeshFilter>().sharedMesh;
+        Mesh originalMesh = originalObjects[originalObjectIndex].GetComponent<MeshFilter>().sharedMesh;
         Mesh mappedMesh = GetComponent<MeshFilter>().sharedMesh;
         Vector3[] vertices = originalMesh.vertices;
         Vector3[] normals = originalMesh.normals;
@@ -390,22 +468,117 @@ public class AnamorphicMapper : MonoBehaviour {
         Vector3[] mappedVertices = mappedMesh.vertices;
         Vector3[] mappedNormals = mappedMesh.normals;
 
-        HashSet<Vector3> verticesSet = new(vertices);
-        print(verticesSet.Count);
+        // Calculate triangle normals
+        Vector3[] optimizedTriangleNormals = mappedTriangleNormals;
+        // Vector3[] optimizedTriangleNormals = new Vector3[triangleNormals.Length];
 
-        return true;
+        // Find a rotation to base the other triangles on.
+        // TODO improve selection routine. Currently just picks the first triangle, while there are probably more optimal choices. Or maybe just run an exhaustive search to minimize bounding box? Would likely require running everything below here N times.
+        int initialTriangleIndex = 0;
+        // Rotate all triangle relative to this initial triangle
+        for (int i = 0; i < meshTriangleNormals.Length; i++) {
+            Vector3 rotation = Quaternion.FromToRotation(meshTriangleNormals[initialTriangleIndex], meshTriangleNormals[i]).eulerAngles;
+            optimizedTriangleNormals[i] = Quaternion.Euler(rotation.x, -rotation.y, rotation.z) * mappedTriangleNormals[initialTriangleIndex];
+        }
+        // return true;
+        // Map which vertices are part of which triangles
+        Dictionary<int, HashSet<int>> vertexTriangleMap = CreateVertexTriangleMap(triangles, vertices.Length);
 
-        float minAngle = float.PositiveInfinity;
-        int minAngleIndex = -1;
-        // Find minimum angle
-        for (int i = 0; i < vertices.Length; i++) {
-            float angle = Vector3.Angle(normals[i], mappedNormals[i]);
-            if (angle < minAngle) {
-                minAngle = angle;
-                minAngleIndex = i;
+        bool[] optimizedVertexIsPlaced = new bool[vertices.Length];
+        optimizedVertices = new Vector3[vertices.Length];
+        // Use triangle normals to find their plane and calculate intersections with the reflection rays, radiating outward from the triangle used to find the rotation.
+        // Place initial vertices and queue up other vertices connected to these vertices
+        List<int> initialVertices = new() {
+            triangles[3*initialTriangleIndex],
+            triangles[3*initialTriangleIndex+1],
+            triangles[3*initialTriangleIndex+2]
+        };
+        // source vertex, triangle, placeable vertex
+        Queue<(int, int, int)> placeableVertices = new();
+        foreach (int v in initialVertices) {
+            optimizedVertices[v] = mappedVertices[v];
+            optimizedVertexIsPlaced[v] = true;
+
+            // Get connected triangles and vertices
+            HashSet<int> vertexTriangles = vertexTriangleMap[v];
+            foreach (int vt in vertexTriangles) {
+                int v0 = triangles[3 * vt];
+                int v1 = triangles[3 * vt + 1];
+                int v2 = triangles[3 * vt + 2];
+                // Only add vertex if not itself or a vertex connected to the initial triangle
+                if (v0 != v && vt != initialTriangleIndex) placeableVertices.Enqueue((v, vt, v0));
+                if (v1 != v && vt != initialTriangleIndex) placeableVertices.Enqueue((v, vt, v1));
+                if (v2 != v && vt != initialTriangleIndex) placeableVertices.Enqueue((v, vt, v2));
             }
         }
-        print("Minimum angle " + minAngle + " at index " + minAngleIndex);
+
+        Debug.LogWarning("Initial vertices");
+        foreach (int v in initialVertices) {
+            print("(" + v + ", " + initialTriangleIndex + ")");
+        }
+
+        Debug.LogWarning("Placeable triangles");
+        foreach ((int sv, int t, int v) in placeableVertices) {
+            print("(" + sv + ", " + t + ", " + v + ")");
+        }
+
+        // Place vertices until no more are left
+        int maxIterations = triangles.Length;
+        int iter = 0;
+        while (placeableVertices.Count != 0 && iter < maxIterations) {
+            // Track iterations and limit them just in case.
+            // iter++;
+
+            (int sv, int t, int v) = placeableVertices.Dequeue();
+            Debug.LogWarning("Trying to place vertex " + v + " based on triangle " + t + " and source vertex " + sv);
+
+            int lastReflection = numReflections[v] - 1;
+            if (lastReflection < 0) {
+                Debug.LogError("Vertex " + v + " did not have any reflections");
+                continue;
+            }
+            // Calculate intersection of vertex's reflection ray with the plane it is to be placed in
+            bool doesIntersect = MathUtilities.LinePlaneIntersection(out Vector3 intersection, mirrorHits[v, lastReflection], reflections[v, lastReflection], optimizedTriangleNormals[t], optimizedVertices[sv]);
+            if (!doesIntersect) {
+                Debug.LogError("Vertex " + v + " has no intersection with the plane formed by triangle " + t + " and vertex " + sv);
+                continue;
+            }
+            print("Vertex " + v + " intersects its reflection ray at " + intersection);
+            // Add the vertex if it hasn't been placed yet
+            if (optimizedVertexIsPlaced[v]) {
+                float sqrDistance = Vector3.SqrMagnitude(intersection - optimizedVertices[v]);
+                Debug.Log("Vertex " + v + " is already placed at " + optimizedVertices[v] + ". Sqr distance between placements: " + sqrDistance);
+                if (sqrDistance < 0.005f) {
+                    Debug.Log("Skipping duplicate placement");
+                    continue;
+                } else {
+                    Debug.LogError("Distance too large. Needs solution!");
+                    continue;
+                }
+            }
+            optimizedVertices[v] = intersection;
+            optimizedVertexIsPlaced[v] = true;
+            // Add the neighbouring vertices that haven't already been placed
+            HashSet<int> vertexTriangles = vertexTriangleMap[v];
+            foreach (int vt in vertexTriangles) {
+                int v0 = triangles[3 * vt];
+                int v1 = triangles[3 * vt + 1];
+                int v2 = triangles[3 * vt + 2];
+                // Only add vertex if not itself or a vertex connected to the initial triangle
+                if (v0 != v && vt != t) placeableVertices.Enqueue((v, vt, v0));
+                if (v1 != v && vt != t) placeableVertices.Enqueue((v, vt, v1));
+                if (v2 != v && vt != t) placeableVertices.Enqueue((v, vt, v2));
+            }
+        }
+        print(iter);
+
+        // Set the vertices and update normals and colliders.
+        mappedMesh.SetVertices(optimizedVertices);
+        RecalculateNormals(mappedMesh, vertices);
+
+        UpdateCollider();
+
+        optimizedNormals = mappedMesh.normals;
 
         return true;
     }
@@ -433,6 +606,8 @@ public class AnamorphicMapper : MonoBehaviour {
     public void Clear() {
         globalMeshVertices = null;
         meshNormals = null;
+        meshTrianglePositions = null;
+        meshTriangleNormals = null;
         raycastDirections = null;
         numReflections = null;
         mirrorHits = null;
@@ -440,6 +615,8 @@ public class AnamorphicMapper : MonoBehaviour {
         reflections = null;
         mappedVertices = null;
         mappedNormals = null;
+        mappedTrianglePositions = null;
+        mappedTriangleNormals = null;
         // occludedMappedVertexIndices = null;
         optimizedVertices = null;
         optimizedNormals = null;
@@ -468,6 +645,15 @@ public class AnamorphicMapper : MonoBehaviour {
                 for (int r = 0; r < numReflections[i]; r++) {
                     Gizmos.DrawLine(globalMeshVertices[i], globalMeshVertices[i] + meshNormals[i]);
                 }
+            }
+        }
+        // Original triangle normals
+        Gizmos.color = Color.green;
+        if (showMeshTriangleNormals && meshTriangleNormals != null && meshTrianglePositions != null && Status != MappingStatus.None) {
+            Transform originalObjectTransform = originalObjects[originalObjectIndex].transform;
+            for (int i = 0; i < meshTriangleNormals.Length; i++) {
+                Vector3 globalTrianglePos = originalObjectTransform.TransformPoint(meshTrianglePositions[i]);
+                Gizmos.DrawLine(globalTrianglePos, globalTrianglePos + meshTriangleNormals[i]);
             }
         }
         // Raycast directions
@@ -502,7 +688,7 @@ public class AnamorphicMapper : MonoBehaviour {
         if (showReflections && mirrorHits != null && reflections != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax && i < reflections.Length; i++) {
                 for (int r = 0; r < numReflections[i]; r++) {
-                    Gizmos.DrawLine(mirrorHits[i, r], mirrorHits[i, r] + reflections[i, r]);
+                    Gizmos.DrawLine(mirrorHits[i, r], mirrorHits[i, r] + reflections[i, r] * reflectionDistance);
                 }
             }
         }
@@ -523,12 +709,11 @@ public class AnamorphicMapper : MonoBehaviour {
                 }
             }
         }
-        // Additional reflection length
-        Gizmos.color = Color.magenta;
-        if (showAdditionalReflectionDistance && mappedVertices != null && reflections != null && numReflections != null && Status != MappingStatus.None) {
-            for (int i = (int) showMin; i <= showMax && i < mappedVertices.Length; i++) {
-                if (numReflections[i] == 0) continue;
-                Gizmos.DrawLine(mappedVertices[i], mappedVertices[i] + reflections[i, numReflections[i] - 1]);
+        // Mapped triangle normals
+        Gizmos.color = Color.green;
+        if (showMappedTriangleNormals && mappedTriangleNormals != null && mappedTrianglePositions != null && Status != MappingStatus.None) {
+            for (int i = 0; i < mappedTriangleNormals.Length; i++) {
+                Gizmos.DrawLine(mappedTrianglePositions[i], mappedTrianglePositions[i] + mappedTriangleNormals[i]);
             }
         }
         // Occluded vertices. Not really used though
@@ -561,8 +746,8 @@ public class AnamorphicMapper : MonoBehaviour {
     }
 
     private void UpdateMaterials() {
-        if (originalObject == null) return;
-        MeshRenderer anamorphMeshRenderer = originalObject.GetComponent<MeshRenderer>();
+        if (originalObjects[originalObjectIndex] == null) return;
+        MeshRenderer anamorphMeshRenderer = originalObjects[originalObjectIndex].GetComponent<MeshRenderer>();
         MeshRenderer mappedMeshRenderer = GetComponent<MeshRenderer>();
         switch (renderMode) {
             case RenderMode.Texture:
@@ -588,6 +773,11 @@ public class AnamorphicMapper : MonoBehaviour {
     }
 
     private void OnValidate() {
+        if (originalObjectIndex < 0) originalObjectIndex = 0;
+        if (originalObjectIndex >= originalObjects.Length) originalObjectIndex = originalObjects.Length - 1;
+        for (int i = 0; i < originalObjects.Length; i++) {
+            originalObjects[i].gameObject.SetActive(i == originalObjectIndex);
+        }
         UpdateShaderRelativePlane();
         UpdateMaterials();
     }
