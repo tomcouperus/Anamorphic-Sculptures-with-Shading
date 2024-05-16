@@ -10,7 +10,7 @@ public class AnamorphicMapper : MonoBehaviour {
     private const string NORMAL_SHADER_MODE_PROP_NAME = "_Mode";
     private const string NORMAL_SHADER_RELATIVE_PLANE_PROP_NAME = "_RelativePlane";
 
-    private enum OptimizerMode { XZPlane, TriangleNormals }
+    private enum OptimizerMode { XZPlane, TriangleNormals, IterativeDescent }
 
     [Header("Settings")]
     [SerializeField]
@@ -37,7 +37,7 @@ public class AnamorphicMapper : MonoBehaviour {
     [Tooltip("Linearly scales the distance between mirror and mapped vertices.")]
     private float scale = 1.0f;
     [SerializeField]
-    private OptimizerMode optimizer = OptimizerMode.TriangleNormals;
+    private OptimizerMode optimizer = OptimizerMode.IterativeDescent;
 
     public enum MappingStatus { None, Mapped, Optimized };
     public MappingStatus Status { get; private set; } = MappingStatus.None;
@@ -501,7 +501,7 @@ public class AnamorphicMapper : MonoBehaviour {
         Dictionary<int, HashSet<int>> vertexTriangleMap = CreateVertexTriangleMap(triangles, vertices.Length);
         List<int>[] vertexIdentityMap = CreateVertexIdentityMap(vertices);
 
-        bool[] optimizedVertexIsPlaced = new bool[vertices.Length];
+        int[] optimizedVertexIsPlaced = new int[vertices.Length];
         optimizedVertices = new Vector3[vertices.Length];
         // Use triangle normals to find their plane and calculate intersections with the reflection rays, radiating outward from the triangle used to find the rotation.
         // Place initial vertices and queue up other vertices connected to these vertices
@@ -514,7 +514,7 @@ public class AnamorphicMapper : MonoBehaviour {
         Queue<(int, int, int)> placeableVertices = new();
         foreach (int v in initialVertices) {
             optimizedVertices[v] = mappedVertices[v];
-            optimizedVertexIsPlaced[v] = true;
+            optimizedVertexIsPlaced[v]++;
 
             // Get connected triangles and vertices
             HashSet<int> vertexTriangles = vertexTriangleMap[v];
@@ -540,9 +540,9 @@ public class AnamorphicMapper : MonoBehaviour {
         // }
 
         // Place vertices until no more are left
-        int maxIterations = 10000;
+        int maxIterations = 20000;
         int iter = 0;
-        while (placeableVertices.Count != 0 /* && iter < maxIterations */) {
+        while (placeableVertices.Count != 0 && iter < maxIterations) {
             // Track iterations and limit them just in case.
             iter++;
 
@@ -563,20 +563,30 @@ public class AnamorphicMapper : MonoBehaviour {
             }
             // print("Vertex " + v + " intersects its reflection ray at " + intersection);
             // Add the vertex if it hasn't been placed yet
-            if (optimizedVertexIsPlaced[v]) {
+            if (optimizedVertexIsPlaced[v] > 0) {
                 float sqrDistance = Vector3.SqrMagnitude(intersection - optimizedVertices[v]);
                 // Debug.Log("Vertex " + v + " is already placed at " + optimizedVertices[v] + ". Sqr distance between placements: " + sqrDistance);
                 if (sqrDistance < 0.005f) {
                     // Debug.Log("Skipping duplicate placement");
                     continue;
                 } else {
-                    // TODO look into better ways of picking the optimal location. This is a "decent" fix, but still very suboptimal.
-                    Debug.LogError("Distance too large. Needs solution!");
-                    float sqrDistanceOptimizedMapped = Vector3.SqrMagnitude(optimizedVertices[v] - mappedVertices[v]);
-                    float sqrDistanceIntersectMapped = Vector3.SqrMagnitude(intersection - mappedVertices[v]);
-                    Debug.Log("Old distance to mapped point: " + sqrDistanceOptimizedMapped);
-                    Debug.Log("New distance to mapped point: " + sqrDistanceIntersectMapped);
-                    // // New
+                    Debug.LogError("Distance too large for vertex " + v + ". Needs solution!");
+                    Debug.Log("Current: " + optimizedVertices[v]);
+                    Debug.Log("New: " + intersection);
+                    // // Version 3: having a center of mass to decide which of the two options to keep. 
+                    // // TODO: Not implemented yet. Ideas?
+                    // // Version 2: averaging all optimized positions
+                    // // TODO: also not optimal. Averaging the problematic vertices does bring in the high negative z values, but also moves the lower negative z values closer to 0, leading to vertices from the back in front of the front face, and vertices from the back/slide being moved very far back...
+                    // intersection += optimizedVertexIsPlaced[v] * optimizedVertices[v];
+                    // intersection /= optimizedVertexIsPlaced[v] + 1;
+                    // Debug.Log("Using average: " + intersection);
+                    // continue;
+                    // // Version 1: based on distance to original mapped location
+                    // // TODO look into better ways of picking the optimal location. This is a "decent" fix in the sense that the mesh is not all over the place, but it's still not good.
+                    // float sqrDistanceOptimizedMapped = Vector3.SqrMagnitude(optimizedVertices[v] - mappedVertices[v]);
+                    // float sqrDistanceIntersectMapped = Vector3.SqrMagnitude(intersection - mappedVertices[v]);
+                    // Debug.Log("Old distance to mapped point: " + sqrDistanceOptimizedMapped);
+                    // Debug.Log("New distance to mapped point: " + sqrDistanceIntersectMapped);
                     // if (sqrDistanceIntersectMapped > sqrDistanceOptimizedMapped) {
                     //     Debug.LogWarning("New distance larger than old. Skipping placement");
                     //     continue;
@@ -585,36 +595,36 @@ public class AnamorphicMapper : MonoBehaviour {
                     continue;
                 }
             }
-            // Old
-            optimizedVertices[v] = intersection;
-            optimizedVertexIsPlaced[v] = true;
-            // Add the neighbouring vertices that haven't already been placed
-            HashSet<int> vertexTriangles = vertexTriangleMap[v];
-            foreach (int vt in vertexTriangles) {
-                int v0 = triangles[3 * vt];
-                int v1 = triangles[3 * vt + 1];
-                int v2 = triangles[3 * vt + 2];
-                // Only add vertex if not itself or a vertex connected to the initial triangle
-                if (v0 != v && vt != t) placeableVertices.Enqueue((v, vt, v0));
-                if (v1 != v && vt != t) placeableVertices.Enqueue((v, vt, v1));
-                if (v2 != v && vt != t) placeableVertices.Enqueue((v, vt, v2));
-            }
-            // // New
-            // foreach (int vi in vertexIdentityMap[v]) {
-            //     optimizedVertices[vi] = intersection;
-            //     optimizedVertexIsPlaced[vi] = true;
-            //     // print("Vertex " + v + " with triangle normal " + optimizedTriangleNormals[t] + " has identical vertex " + vi + ", with triangle normal " + optimizedTriangleNormals[vertexTriangleMap[vi].First()]);
-            //     HashSet<int> vertexTrianglesTest = vertexTriangleMap[vi];
-            //     foreach (int vt in vertexTrianglesTest) {
-            //         int v0 = triangles[3 * vt];
-            //         int v1 = triangles[3 * vt + 1];
-            //         int v2 = triangles[3 * vt + 2];
-            //         // Only add vertex if not itself or a vertex connected to the initial triangle
-            //         if (v0 != vi && vt != t) placeableVertices.Enqueue((vi, vt, v0));
-            //         if (v1 != vi && vt != t) placeableVertices.Enqueue((vi, vt, v1));
-            //         if (v2 != vi && vt != t) placeableVertices.Enqueue((vi, vt, v2));
-            //     }
+            // // Old
+            // optimizedVertices[v] = intersection;
+            // optimizedVertexIsPlaced[v]++;
+            // // Add the neighbouring vertices that haven't already been placed
+            // HashSet<int> vertexTriangles = vertexTriangleMap[v];
+            // foreach (int vt in vertexTriangles) {
+            //     int v0 = triangles[3 * vt];
+            //     int v1 = triangles[3 * vt + 1];
+            //     int v2 = triangles[3 * vt + 2];
+            //     // Only add vertex if not itself or a vertex connected to the initial triangle
+            //     if (v0 != v && vt != t) placeableVertices.Enqueue((v, vt, v0));
+            //     if (v1 != v && vt != t) placeableVertices.Enqueue((v, vt, v1));
+            //     if (v2 != v && vt != t) placeableVertices.Enqueue((v, vt, v2));
             // }
+            // New
+            foreach (int vi in vertexIdentityMap[v]) {
+                optimizedVertices[vi] = intersection;
+                optimizedVertexIsPlaced[vi]++;
+                // print("Vertex " + v + " with triangle normal " + optimizedTriangleNormals[t] + " has identical vertex " + vi + ", with triangle normal " + optimizedTriangleNormals[vertexTriangleMap[vi].First()]);
+                HashSet<int> vertexTrianglesTest = vertexTriangleMap[vi];
+                foreach (int vt in vertexTrianglesTest) {
+                    int v0 = triangles[3 * vt];
+                    int v1 = triangles[3 * vt + 1];
+                    int v2 = triangles[3 * vt + 2];
+                    // Only add vertex if not itself or a vertex connected to the initial triangle
+                    if (v0 != vi && vt != t) placeableVertices.Enqueue((vi, vt, v0));
+                    if (v1 != vi && vt != t) placeableVertices.Enqueue((vi, vt, v1));
+                    if (v2 != vi && vt != t) placeableVertices.Enqueue((vi, vt, v2));
+                }
+            }
         }
         print(iter + "/" + maxIterations);
 
