@@ -150,6 +150,7 @@ public class AnamorphicMapper : MonoBehaviour {
         bool allCastsHit = true;
         for (int i = 0; i < vertices.Length; i++) {
             // Initial raycast
+            // TODO possible optimisation is less normalising and multiplying by distance of the reflection vectors
             Vector3 origin = viewPosition.position; // Use as null value, as Vector3 is not nullable
             raycastDirections[i] = globalMeshVertices[i] - origin;
             Vector3 direction = raycastDirections[i].normalized;
