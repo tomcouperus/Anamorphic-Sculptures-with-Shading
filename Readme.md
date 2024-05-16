@@ -15,3 +15,6 @@ Conclusion: doesn't work for shapes in 3D other than those extruded from 2D.
 - [ ] Sphere is still wonky, because of the cubic-sphere thing. The edges where two of the six sides meet is probably duplicate vertices. To fix: use the duplicate vertices trick to continue the optimizing algo.
 
 Conclusion: does not have enough freedoms once enough vertices have been placed.
+
+# 3D iterative descent
+Tries to reduce the angle of each vertex/triangle compared to the original.

@@ -10,7 +10,7 @@ public class AnamorphicMapper : MonoBehaviour {
     private const string NORMAL_SHADER_MODE_PROP_NAME = "_Mode";
     private const string NORMAL_SHADER_RELATIVE_PLANE_PROP_NAME = "_RelativePlane";
 
-    private enum OptimizerMode { XZPlane, TriangleNormals, IterativeDescent }
+    private enum OptimizerMode { XZPlane, TriangleNormals, IterativeDescentTriangles }
 
     [Header("Settings")]
     [SerializeField]
@@ -37,7 +37,7 @@ public class AnamorphicMapper : MonoBehaviour {
     [Tooltip("Linearly scales the distance between mirror and mapped vertices.")]
     private float scale = 1.0f;
     [SerializeField]
-    private OptimizerMode optimizer = OptimizerMode.IterativeDescent;
+    private OptimizerMode optimizer = OptimizerMode.IterativeDescentTriangles;
 
     public enum MappingStatus { None, Mapped, Optimized };
     public MappingStatus Status { get; private set; } = MappingStatus.None;
@@ -57,8 +57,8 @@ public class AnamorphicMapper : MonoBehaviour {
     [Tooltip("In render mode 'Relative' this determines the plane in which the angle is calculated.")]
     private RelativeMode relativeMode = RelativeMode.XZPlane;
 
-    [Header("Debug")]
     private const float GIZMO_SPHERE_RADIUS = 0.1f;
+    [Header("Debug")]
     [SerializeField]
     private Vector3[] globalMeshVertices = null;
     [SerializeField]
@@ -247,7 +247,7 @@ public class AnamorphicMapper : MonoBehaviour {
         // Recalculate the normals. 
         // If the original mesh is flagged as continuous, average the normals at those vertices that share positions with other vertices.
         mappedMesh.RecalculateNormals();
-        if (originalObjects[originalObjectIndex].meshIsContinuous) {
+        if (originalObjects[originalObjectIndex].normalsAreContinuous) {
             Vector3[] mappedNormals = mappedMesh.normals;
             // First group the vertices by position
             Dictionary<Vector3, List<int>> positionVertexMap = GroupDuplicateVerticesByPosition(vertices);
@@ -463,7 +463,7 @@ public class AnamorphicMapper : MonoBehaviour {
     private bool OptimizeTriangleNormals() {
         Debug.Log("Applying triangle normals optimizer. Limited to objects morphed by a convex mirror. Possible to work on more, but that is unverified.");
         if (!originalObjects[originalObjectIndex].meshIsContinuous) {
-            Debug.LogError("This method only works on continuous meshes. For now, at least");
+            Debug.LogError("This method only works on continuous meshes.");
             return false;
         }
 
@@ -654,7 +654,7 @@ public class AnamorphicMapper : MonoBehaviour {
                 break;
             default:
                 Debug.LogError("Optimization mode not implemented.");
-                break;
+                return;
         }
         Status = MappingStatus.Optimized;
     }

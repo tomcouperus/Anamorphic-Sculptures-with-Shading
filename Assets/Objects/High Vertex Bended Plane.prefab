@@ -58,4 +58,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: faa73673f3002469abb2128705272c46, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  meshIsContinuous: 0
+  meshIsContinuous: 1
+  normalsAreContinuous: 1
