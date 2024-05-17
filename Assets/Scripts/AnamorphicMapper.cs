@@ -209,7 +209,7 @@ public class AnamorphicMapper : MonoBehaviour {
         // Send the original normals to the shader as uv values;
         // Using uv 3, since unity doc says that 1 and 2 can be used for various lightmaps
         mappedMesh.SetUVs(3, meshNormals);
-        RecalculateNormals(mappedMesh, vertices);
+        RecalculateNormals(mappedMesh, vertices, originalObjects[originalObjectIndex].normalsAreContinuous);
 
         GetComponent<MeshFilter>().sharedMesh = mappedMesh;
 
@@ -232,32 +232,32 @@ public class AnamorphicMapper : MonoBehaviour {
     /// Recalculates the normals of the mapped mesh. 
     /// If the vertices of the original object have duplicates at the same position for UV reasons but are still supposed to form a continuous surface, such as a cube-sphere, this method will account for that.
     /// </summary>
-    /// <param name="mappedMesh">Mesh of which the normals are to be calculated</param>
+    /// <param name="mesh">Mesh of which the normals are to be calculated</param>
     /// <param name="vertices">Original object's vertices</param>
-    private void RecalculateNormals(Mesh mappedMesh, Vector3[] vertices) {
+    private static void RecalculateNormals(Mesh mesh, Vector3[] vertices, bool continuousNormals) {
         // Recalculate the normals. 
         // If the original mesh is flagged as continuous, average the normals at those vertices that share positions with other vertices.
-        mappedMesh.RecalculateNormals();
-        if (originalObjects[originalObjectIndex].normalsAreContinuous) {
-            Vector3[] mappedNormals = mappedMesh.normals;
+        mesh.RecalculateNormals();
+        if (continuousNormals) {
+            Vector3[] normals = mesh.normals;
             // First group the vertices by position
             Dictionary<Vector3, List<int>> positionVertexMap = GroupDuplicateVerticesByPosition(vertices);
             // Iterate over each position's indices and add the normals together to form a continuous surface.
             foreach (List<int> indices in positionVertexMap.Values) {
                 Vector3 totalNormal = Vector3.zero;
                 foreach (int i in indices) {
-                    totalNormal += mappedNormals[i];
+                    totalNormal += normals[i];
                 }
                 totalNormal.Normalize();
                 foreach (int i in indices) {
-                    mappedNormals[i] = totalNormal;
+                    normals[i] = totalNormal;
                 }
             }
-            mappedMesh.SetNormals(mappedNormals);
+            mesh.SetNormals(normals);
         }
     }
 
-    private Dictionary<Vector3, List<int>> GroupDuplicateVerticesByPosition(Vector3[] vertices) {
+    private static Dictionary<Vector3, List<int>> GroupDuplicateVerticesByPosition(Vector3[] vertices) {
         Dictionary<Vector3, List<int>> positionVertexMap = new();
         for (int i = 0; i < vertices.Length; i++) {
             Vector3 position = vertices[i];
@@ -269,7 +269,7 @@ public class AnamorphicMapper : MonoBehaviour {
         return positionVertexMap;
     }
 
-    private List<int>[] CreateVertexIdentityMap(Vector3[] vertices) {
+    private static List<int>[] CreateVertexIdentityMap(Vector3[] vertices) {
         Dictionary<Vector3, List<int>> positionVertexMap = GroupDuplicateVerticesByPosition(vertices);
         List<int>[] vertexIdentityMap = new List<int>[vertices.Length];
         foreach (List<int> identicalVertices in positionVertexMap.Values) {
@@ -376,7 +376,7 @@ public class AnamorphicMapper : MonoBehaviour {
         }
 
         mappedMesh.SetVertices(optimizedVertices);
-        RecalculateNormals(mappedMesh, originalVertices);
+        RecalculateNormals(mappedMesh, originalVertices, originalObjects[originalObjectIndex].normalsAreContinuous);
 
         UpdateCollider();
 
@@ -434,12 +434,12 @@ public class AnamorphicMapper : MonoBehaviour {
     /// The key of the map is the vertex index. These are mapped to a set of triangle indices.
     /// </summary>
     /// <param name="triangles"></param>
-    /// <param name="vertexCount"></param>
+    /// <param name="vertices"></param>
     /// <returns></returns>
-    private Dictionary<int, HashSet<int>> CreateVertexTriangleMap(int[] triangles, int vertexCount) {
+    private Dictionary<int, HashSet<int>> CreateVertexTriangleMap(int[] triangles, Vector3[] vertices) {
         // First initialize the vertex to triangle mapping
         Dictionary<int, HashSet<int>> vertexTriangleMap = new();
-        for (int i = 0; i < vertexCount; i++) {
+        for (int i = 0; i < vertices.Length; i++) {
             vertexTriangleMap.Add(i, new HashSet<int>());
         }
         // Then iterate over all the triangles, and add the triangle to the relevant vertex in the map
@@ -489,7 +489,7 @@ public class AnamorphicMapper : MonoBehaviour {
         }
         // return true;
         // Map which vertices are part of which triangles
-        Dictionary<int, HashSet<int>> vertexTriangleMap = CreateVertexTriangleMap(triangles, vertices.Length);
+        Dictionary<int, HashSet<int>> vertexTriangleMap = CreateVertexTriangleMap(triangles, vertices);
         List<int>[] vertexIdentityMap = CreateVertexIdentityMap(vertices);
 
         int[] optimizedVertexIsPlaced = new int[vertices.Length];
@@ -621,7 +621,7 @@ public class AnamorphicMapper : MonoBehaviour {
 
         // Set the vertices and update normals and colliders.
         mappedMesh.SetVertices(optimizedVertices);
-        RecalculateNormals(mappedMesh, vertices);
+        RecalculateNormals(mappedMesh, vertices, originalObjects[originalObjectIndex].normalsAreContinuous);
 
         UpdateCollider();
 
@@ -632,9 +632,7 @@ public class AnamorphicMapper : MonoBehaviour {
 
     private bool OptimizeIterativeDescent() {
         Debug.Log("Applying iterative descent method to minimize angles between original vertex normals and mapped vertex normals.");
-
-        // Displacement factor
-        float displacementFactor = 0.01f;
+        Mesh mesh = GetComponent<MeshFilter>().sharedMesh;
 
         // Initialise optimized vertices
         optimizedVertices = (Vector3[]) mappedVertices.Clone();
@@ -644,6 +642,7 @@ public class AnamorphicMapper : MonoBehaviour {
         for (int i = 0; i < idealVertexNormals.Length; i++) {
             idealVertexNormals[i].z *= -1;
         }
+        optimizedNormals = idealVertexNormals;
 
         // Calculate the initial angular deviation for each vertex
         Dictionary<int, float> normalAnglesFromIdeal = new();
@@ -657,9 +656,9 @@ public class AnamorphicMapper : MonoBehaviour {
 
         // Sort the angles (and the indices)
         List<KeyValuePair<int, float>> sortedNormalAnglesFromIdeal = normalAnglesFromIdeal.ToList();
-        static int smallToLargeSorter(KeyValuePair<int, float> pair1, KeyValuePair<int, float> pair2) {
-            return pair1.Value.CompareTo(pair2.Value);
-        }
+        // static int smallToLargeSorter(KeyValuePair<int, float> pair1, KeyValuePair<int, float> pair2) {
+        //     return pair1.Value.CompareTo(pair2.Value);
+        // }
         static int largeToSmallSorter(KeyValuePair<int, float> pair1, KeyValuePair<int, float> pair2) {
             return pair2.Value.CompareTo(pair1.Value);
         }
@@ -669,58 +668,52 @@ public class AnamorphicMapper : MonoBehaviour {
         // }
 
         List<int>[] vertexIdentityMap = CreateVertexIdentityMap(globalMeshVertices);
+        Dictionary<int, HashSet<int>> vertexTriangleMap = CreateVertexTriangleMap(mesh.triangles, optimizedVertices);
         int numIterations = 100;
+        // Random.InitState(0);
         for (int n = 0; n < numIterations; n++) {
+            Mesh proposedMesh = new();
             Vector3[] proposedVertices = (Vector3[]) optimizedVertices.Clone();
-            // Pick vertex
-            // int chosenListIndex = 0;
-            int chosenListIndex = Random.Range(0, sortedNormalAnglesFromIdeal.Count);
+
+            // Pick a vertex from the list to mutate
+            int chosenListIndex = Random.Range(0, proposedVertices.Length);
             (int v, float angle) = sortedNormalAnglesFromIdeal[chosenListIndex];
-            Debug.LogWarning("Chosen: deviation " + angle + " at vertex " + v);
 
-            // Get identical vertices
+            // Pick a mutation
+            float mutation = vertexDistancesFromMirror[v] * 1.01f;
+            // bool addMutation = Random.Range(0, 2) == 0;
+            // if (addMutation) mutation = vertexDistancesFromMirror[v] - mutation;
+            // else mutation = vertexDistancesFromMirror[v] - mutation;
+
+            // Displace all identical vertices
             List<int> identicalVertices = vertexIdentityMap[v];
-            // string identicalVerticesString = identicalVertices[0].ToString();
-            // for (int i = 1; i < identicalVertices.Count; i++) identicalVerticesString += ", " + identicalVertices[i];
-            // Debug.Log("Identical vertices: " + identicalVerticesString);
-
-            // Displace vertex (and its identicals)
-            float originalDistance = vertexDistancesFromMirror[v];
-            float newDistance = originalDistance * (1 + displacementFactor);
-            foreach (int i in identicalVertices) {
+            for (int i = 0; i < identicalVertices.Count; i++) {
                 int lastReflection = numReflections[i] - 1;
                 if (lastReflection < 0) continue;
-                proposedVertices[i] = mirrorHits[i, lastReflection] + scale * newDistance * reflections[i, lastReflection];
+                proposedVertices[i] = mirrorHits[i, lastReflection] + scale * mutation * reflections[i, lastReflection];
             }
-            // Debug.Log("Moved vertex " + v + " from " + mappedVertices[v] + " to " + proposedVertices[v]);
 
-            // Update mesh
-            Mesh optimizedMesh = GetComponent<MeshFilter>().sharedMesh;
-            optimizedMesh.SetVertices(proposedVertices);
-            RecalculateNormals(optimizedMesh, proposedVertices); //TODO recalculate locally to save time
-            UpdateCollider();
-            optimizedNormals = optimizedMesh.normals;
-
-            // Recalculate the total deviation
-            // TODO recalculate locally to save time
-            float optimizedTotalAngleFromIdeal = 0;
+            // Recalculate the normals
+            // TODO figure out local calculation. First attempt did not match exactly, so postponed in favour of proof of concept
+            proposedMesh.SetVertices(proposedVertices);
+            proposedMesh.SetTriangles(mesh.triangles, 0);
+            RecalculateNormals(proposedMesh, proposedVertices, originalObjects[originalObjectIndex].normalsAreContinuous);
+            Vector3[] proposedNormals = proposedMesh.normals;
+            float newTotalAngleFromIdeal = 0;
             for (int i = 0; i < idealVertexNormals.Length; i++) {
-                float angleFromIdeal = Vector3.Angle(idealVertexNormals[i], optimizedNormals[i]);
-                if (angleFromIdeal != normalAnglesFromIdeal[i]) {
-                    Debug.Log("Angle changed for vertex " + i + ", from " + normalAnglesFromIdeal[i] + " to " + angleFromIdeal);
-                }
-                normalAnglesFromIdeal[i] = angleFromIdeal;
-                optimizedTotalAngleFromIdeal += angleFromIdeal;
+                float angleFromIdeal = Vector3.Angle(idealVertexNormals[i], proposedNormals[i]);
+                newTotalAngleFromIdeal += angleFromIdeal;
             }
-            Debug.LogWarning("New total angular deviation of vertex normals: " + optimizedTotalAngleFromIdeal);
-            sortedNormalAnglesFromIdeal = normalAnglesFromIdeal.ToList();
-            sortedNormalAnglesFromIdeal.Sort(largeToSmallSorter);
-            // for (int i = 0; i < sortedNormalAnglesFromIdeal.Count; i++) {
-            //     Debug.Log(sortedNormalAnglesFromIdeal[i]);
-            // }
+            Debug.Log("Vertex " + v + " (" + angle + ") gives new total angular deviation: " + newTotalAngleFromIdeal);
+
+            // Update the actual mesh
+            optimizedVertices = proposedVertices;
+            mesh.SetVertices(proposedVertices);
+            mesh.SetNormals(proposedMesh.normals);
+
         }
 
-        return true;
+        return false;
     }
 
     public void Optimize() {
