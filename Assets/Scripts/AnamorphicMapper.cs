@@ -10,7 +10,7 @@ public class AnamorphicMapper : MonoBehaviour {
     private const string NORMAL_SHADER_MODE_PROP_NAME = "_Mode";
     private const string NORMAL_SHADER_RELATIVE_PLANE_PROP_NAME = "_RelativePlane";
 
-    private enum OptimizerMode { XZPlane, TriangleNormals, IterativeDescentTriangles }
+    private enum OptimizerMode { XZPlane, TriangleNormals, IterativeDescent }
 
     [Header("Settings")]
     [SerializeField]
@@ -30,14 +30,10 @@ public class AnamorphicMapper : MonoBehaviour {
     private int maxReflections = 3;
     [SerializeField]
     [Min(0.00001f)]
-    [Tooltip("Minimum distance between mirror and mapped vertices as multiple of anamorph object bounding box.")]
-    private float minDistance = 1.0f;
-    [SerializeField]
-    [Min(0.00001f)]
     [Tooltip("Linearly scales the distance between mirror and mapped vertices.")]
     private float scale = 1.0f;
     [SerializeField]
-    private OptimizerMode optimizer = OptimizerMode.IterativeDescentTriangles;
+    private OptimizerMode optimizer = OptimizerMode.IterativeDescent;
 
     public enum MappingStatus { None, Mapped, Optimized };
     public MappingStatus Status { get; private set; } = MappingStatus.None;
@@ -77,6 +73,8 @@ public class AnamorphicMapper : MonoBehaviour {
     private Vector3[,] mirrorNormals = null;
     [SerializeField]
     private Vector3[,] reflections = null;
+    [SerializeField]
+    private float[] vertexDistancesFromMirror = null;
     [SerializeField]
     private Vector3[] mappedVertices = null;
     [SerializeField]
@@ -146,6 +144,7 @@ public class AnamorphicMapper : MonoBehaviour {
         mirrorHits = new Vector3[vertices.Length, maxReflections];
         mirrorNormals = new Vector3[vertices.Length, maxReflections];
         reflections = new Vector3[vertices.Length, maxReflections];
+        vertexDistancesFromMirror = new float[vertices.Length];
 
         bool allCastsHit = true;
         for (int i = 0; i < vertices.Length; i++) {
@@ -166,8 +165,8 @@ public class AnamorphicMapper : MonoBehaviour {
             mirrorHits[i, 0] = hits[0].point;
             mirrorNormals[i, 0] = hits[0].normal;
 
-            float d = Vector3.Distance(globalMeshVertices[i], mirrorHits[i, 0]);
-            reflections[i, 0] = Vector3.Reflect(direction, mirrorNormals[i, 0]) * d;
+            vertexDistancesFromMirror[i] = Vector3.Distance(globalMeshVertices[i], mirrorHits[i, 0]);
+            reflections[i, 0] = Vector3.Reflect(direction, mirrorNormals[i, 0]);
             numReflections[i]++;
 
             // Reflections
@@ -180,22 +179,13 @@ public class AnamorphicMapper : MonoBehaviour {
 
                 mirrorHits[i, r] = hits[0].point;
                 mirrorNormals[i, r] = hits[0].normal;
-                reflections[i, r] = Vector3.Reflect(direction, mirrorNormals[i, r]) * d;
-                reflections[i, r - 1] = reflections[i, r - 1].normalized * Vector3.Distance(origin, mirrorHits[i, r]);
+                reflections[i, r] = Vector3.Reflect(direction, mirrorNormals[i, r]);
+                reflections[i, r - 1] = direction * Vector3.Distance(origin, mirrorHits[i, r]);
                 numReflections[i]++;
             }
         }
         if (!allCastsHit) {
             Debug.LogError("Some initial raycasts did not hit the mirror. Reposition the mirror or increase the maximum raycast distance.");
-        }
-
-        // Take the minimum distance into account
-        for (int i = 0; i < vertices.Length; i++) {
-            int lastReflection = numReflections[i] - 1;
-            if (lastReflection < 0) continue;
-            if (reflections[i, lastReflection].magnitude >= minDistance) continue;
-            reflections[i, lastReflection].Normalize();
-            reflections[i, lastReflection] *= minDistance;
         }
 
         // Use the final reflections to create mesh
@@ -204,7 +194,7 @@ public class AnamorphicMapper : MonoBehaviour {
         for (int i = 0; i < vertices.Length; i++) {
             int lastReflection = numReflections[i] - 1;
             if (lastReflection < 0) continue;
-            mappedVertices[i] = mirrorHits[i, lastReflection] + reflections[i, lastReflection] * scale;
+            mappedVertices[i] = mirrorHits[i, lastReflection] + scale * vertexDistancesFromMirror[i] * reflections[i, lastReflection];
         }
         int[] mappedTriangles = new int[originalMesh.triangles.Length];
         for (int i = 0; i < mappedTriangles.Length; i += 3) {
@@ -640,6 +630,99 @@ public class AnamorphicMapper : MonoBehaviour {
         return true;
     }
 
+    private bool OptimizeIterativeDescent() {
+        Debug.Log("Applying iterative descent method to minimize angles between original vertex normals and mapped vertex normals.");
+
+        // Displacement factor
+        float displacementFactor = 0.01f;
+
+        // Initialise optimized vertices
+        optimizedVertices = (Vector3[]) mappedVertices.Clone();
+
+        // Get the ideal vertex normals
+        Vector3[] idealVertexNormals = (Vector3[]) meshNormals.Clone();
+        for (int i = 0; i < idealVertexNormals.Length; i++) {
+            idealVertexNormals[i].z *= -1;
+        }
+
+        // Calculate the initial angular deviation for each vertex
+        Dictionary<int, float> normalAnglesFromIdeal = new();
+        float totalAngleFromIdeal = 0;
+        for (int i = 0; i < idealVertexNormals.Length; i++) {
+            float angleFromIdeal = Vector3.Angle(idealVertexNormals[i], mappedNormals[i]);
+            normalAnglesFromIdeal.Add(i, angleFromIdeal);
+            totalAngleFromIdeal += angleFromIdeal;
+        }
+        Debug.LogWarning("Initial total angular deviation of vertex normals: " + totalAngleFromIdeal);
+
+        // Sort the angles (and the indices)
+        List<KeyValuePair<int, float>> sortedNormalAnglesFromIdeal = normalAnglesFromIdeal.ToList();
+        static int smallToLargeSorter(KeyValuePair<int, float> pair1, KeyValuePair<int, float> pair2) {
+            return pair1.Value.CompareTo(pair2.Value);
+        }
+        static int largeToSmallSorter(KeyValuePair<int, float> pair1, KeyValuePair<int, float> pair2) {
+            return pair2.Value.CompareTo(pair1.Value);
+        }
+        sortedNormalAnglesFromIdeal.Sort(largeToSmallSorter);
+        // for (int i = 0; i < sortedNormalAnglesFromIdeal.Count; i++) {
+        //     Debug.Log(sortedNormalAnglesFromIdeal[i]);
+        // }
+
+        List<int>[] vertexIdentityMap = CreateVertexIdentityMap(globalMeshVertices);
+        int numIterations = 100;
+        for (int n = 0; n < numIterations; n++) {
+            Vector3[] proposedVertices = (Vector3[]) optimizedVertices.Clone();
+            // Pick vertex
+            // int chosenListIndex = 0;
+            int chosenListIndex = Random.Range(0, sortedNormalAnglesFromIdeal.Count);
+            (int v, float angle) = sortedNormalAnglesFromIdeal[chosenListIndex];
+            Debug.LogWarning("Chosen: deviation " + angle + " at vertex " + v);
+
+            // Get identical vertices
+            List<int> identicalVertices = vertexIdentityMap[v];
+            // string identicalVerticesString = identicalVertices[0].ToString();
+            // for (int i = 1; i < identicalVertices.Count; i++) identicalVerticesString += ", " + identicalVertices[i];
+            // Debug.Log("Identical vertices: " + identicalVerticesString);
+
+            // Displace vertex (and its identicals)
+            float originalDistance = vertexDistancesFromMirror[v];
+            float newDistance = originalDistance * (1 + displacementFactor);
+            foreach (int i in identicalVertices) {
+                int lastReflection = numReflections[i] - 1;
+                if (lastReflection < 0) continue;
+                proposedVertices[i] = mirrorHits[i, lastReflection] + scale * newDistance * reflections[i, lastReflection];
+            }
+            // Debug.Log("Moved vertex " + v + " from " + mappedVertices[v] + " to " + proposedVertices[v]);
+
+            // Update mesh
+            Mesh optimizedMesh = GetComponent<MeshFilter>().sharedMesh;
+            optimizedMesh.SetVertices(proposedVertices);
+            RecalculateNormals(optimizedMesh, proposedVertices); //TODO recalculate locally to save time
+            UpdateCollider();
+            optimizedNormals = optimizedMesh.normals;
+
+            // Recalculate the total deviation
+            // TODO recalculate locally to save time
+            float optimizedTotalAngleFromIdeal = 0;
+            for (int i = 0; i < idealVertexNormals.Length; i++) {
+                float angleFromIdeal = Vector3.Angle(idealVertexNormals[i], optimizedNormals[i]);
+                if (angleFromIdeal != normalAnglesFromIdeal[i]) {
+                    Debug.Log("Angle changed for vertex " + i + ", from " + normalAnglesFromIdeal[i] + " to " + angleFromIdeal);
+                }
+                normalAnglesFromIdeal[i] = angleFromIdeal;
+                optimizedTotalAngleFromIdeal += angleFromIdeal;
+            }
+            Debug.LogWarning("New total angular deviation of vertex normals: " + optimizedTotalAngleFromIdeal);
+            sortedNormalAnglesFromIdeal = normalAnglesFromIdeal.ToList();
+            sortedNormalAnglesFromIdeal.Sort(largeToSmallSorter);
+            // for (int i = 0; i < sortedNormalAnglesFromIdeal.Count; i++) {
+            //     Debug.Log(sortedNormalAnglesFromIdeal[i]);
+            // }
+        }
+
+        return true;
+    }
+
     public void Optimize() {
         // if (!CalculateOccludedMappedVertices(out occludedMappedVertexIndices)) {
         //     Debug.LogError("Error in calculating occluded mapped vertices");
@@ -652,6 +735,9 @@ public class AnamorphicMapper : MonoBehaviour {
                 break;
             case OptimizerMode.TriangleNormals:
                 if (!OptimizeTriangleNormals()) return;
+                break;
+            case OptimizerMode.IterativeDescent:
+                if (!OptimizeIterativeDescent()) return;
                 break;
             default:
                 Debug.LogError("Optimization mode not implemented.");
@@ -670,6 +756,7 @@ public class AnamorphicMapper : MonoBehaviour {
         mirrorHits = null;
         mirrorNormals = null;
         reflections = null;
+        vertexDistancesFromMirror = null;
         mappedVertices = null;
         mappedNormals = null;
         mappedTrianglePositions = null;
@@ -745,7 +832,9 @@ public class AnamorphicMapper : MonoBehaviour {
         if (showReflections && mirrorHits != null && reflections != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax && i < reflections.Length; i++) {
                 for (int r = 0; r < numReflections[i]; r++) {
-                    Gizmos.DrawLine(mirrorHits[i, r], mirrorHits[i, r] + reflections[i, r] * reflectionDistance);
+                    Vector3 reflection = reflections[i, r];
+                    if (r == numReflections[i] - 1) reflection *= vertexDistancesFromMirror[i];
+                    Gizmos.DrawLine(mirrorHits[i, r], mirrorHits[i, r] + reflection * reflectionDistance);
                 }
             }
         }
