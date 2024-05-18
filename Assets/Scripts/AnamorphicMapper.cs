@@ -656,9 +656,6 @@ public class AnamorphicMapper : MonoBehaviour {
 
         // Sort the angles (and the indices)
         List<KeyValuePair<int, float>> sortedNormalAnglesFromIdeal = normalAnglesFromIdeal.ToList();
-        // static int smallToLargeSorter(KeyValuePair<int, float> pair1, KeyValuePair<int, float> pair2) {
-        //     return pair1.Value.CompareTo(pair2.Value);
-        // }
         static int largeToSmallSorter(KeyValuePair<int, float> pair1, KeyValuePair<int, float> pair2) {
             return pair2.Value.CompareTo(pair1.Value);
         }
@@ -668,29 +665,48 @@ public class AnamorphicMapper : MonoBehaviour {
         // }
 
         List<int>[] vertexIdentityMap = CreateVertexIdentityMap(globalMeshVertices);
-        Dictionary<int, HashSet<int>> vertexTriangleMap = CreateVertexTriangleMap(mesh.triangles, optimizedVertices);
-        int numIterations = 100;
-        // Random.InitState(0);
+        int numIterations = 10000;
+        int angleTooSmallRejections = 0;
+        int rejections = 0;
+        Random.InitState(0);
+        float newTotalAngleFromIdeal = totalAngleFromIdeal;
+        int offsetIfStuck = 0;
         for (int n = 0; n < numIterations; n++) {
             Mesh proposedMesh = new();
             Vector3[] proposedVertices = (Vector3[]) optimizedVertices.Clone();
 
+            // If the stuck offset is larger than the amount of vertices we have, the algorithm cannot change any other vertices anymore.
+            if (offsetIfStuck >= optimizedVertices.Length) {
+                Debug.LogWarning("No more vertices to be changed. Stopping at iteration " + n);
+                break;
+            }
+
             // Pick a vertex from the list to mutate
-            int chosenListIndex = Random.Range(0, proposedVertices.Length);
+            int chosenListIndex = 0 + offsetIfStuck;
+            // int chosenListIndex = Random.Range(0, proposedVertices.Length);
             (int v, float angle) = sortedNormalAnglesFromIdeal[chosenListIndex];
+            // If the angle is small enough, ignore and repeat
+            if (angle < 0.2f) {
+                angleTooSmallRejections++;
+                offsetIfStuck++;
+                continue;
+            }
 
             // Pick a mutation
-            float mutation = vertexDistancesFromMirror[v] * 1.01f;
-            // bool addMutation = Random.Range(0, 2) == 0;
-            // if (addMutation) mutation = vertexDistancesFromMirror[v] - mutation;
-            // else mutation = vertexDistancesFromMirror[v] - mutation;
+            float mutation = 0.01f;
+            // mutation = vertexDistancesFromMirror[v] * (1 + mutation);
+            // mutation = vertexDistancesFromMirror[v] * (1 - mutation);
+            bool addMutation = Random.Range(0, 2) == 0;
+            if (addMutation) mutation = vertexDistancesFromMirror[v] * (1 + mutation);
+            else mutation = vertexDistancesFromMirror[v] * (1 - mutation);
 
             // Displace all identical vertices
             List<int> identicalVertices = vertexIdentityMap[v];
             for (int i = 0; i < identicalVertices.Count; i++) {
-                int lastReflection = numReflections[i] - 1;
+                int vi = identicalVertices[i];
+                int lastReflection = numReflections[vi] - 1;
                 if (lastReflection < 0) continue;
-                proposedVertices[i] = mirrorHits[i, lastReflection] + scale * mutation * reflections[i, lastReflection];
+                proposedVertices[vi] = mirrorHits[vi, lastReflection] + scale * mutation * reflections[vi, lastReflection];
             }
 
             // Recalculate the normals
@@ -699,19 +715,42 @@ public class AnamorphicMapper : MonoBehaviour {
             proposedMesh.SetTriangles(mesh.triangles, 0);
             RecalculateNormals(proposedMesh, proposedVertices, originalObjects[originalObjectIndex].normalsAreContinuous);
             Vector3[] proposedNormals = proposedMesh.normals;
-            float newTotalAngleFromIdeal = 0;
+            float proposedTotalAngleFromIdeal = 0;
             for (int i = 0; i < idealVertexNormals.Length; i++) {
                 float angleFromIdeal = Vector3.Angle(idealVertexNormals[i], proposedNormals[i]);
-                newTotalAngleFromIdeal += angleFromIdeal;
+                normalAnglesFromIdeal[i] = angleFromIdeal;
+                proposedTotalAngleFromIdeal += angleFromIdeal;
             }
-            Debug.Log("Vertex " + v + " (" + angle + ") gives new total angular deviation: " + newTotalAngleFromIdeal);
+            Debug.Log("Vertex " + v + " (" + angle + ") gives new total angular deviation: " + proposedTotalAngleFromIdeal);
+            // If no reduction, reject and keep going
+            if (proposedTotalAngleFromIdeal > newTotalAngleFromIdeal) {
+                // Debug.LogWarning("Rejected");
+                offsetIfStuck++;
+                rejections++;
+                continue;
+            }
+            // If accepted, reset stuck offset
+            offsetIfStuck = 0;
+            // If accepted, update all changed distances
+            for (int i = 0; i < identicalVertices.Count; i++) {
+                int vi = identicalVertices[i];
+                vertexDistancesFromMirror[vi] = mutation;
+            }
+            // Update new total
+            newTotalAngleFromIdeal = proposedTotalAngleFromIdeal;
+
+            // Resort the list
+            sortedNormalAnglesFromIdeal = normalAnglesFromIdeal.ToList();
+            sortedNormalAnglesFromIdeal.Sort(largeToSmallSorter);
 
             // Update the actual mesh
             optimizedVertices = proposedVertices;
             mesh.SetVertices(proposedVertices);
             mesh.SetNormals(proposedMesh.normals);
-
         }
+        Debug.Log("Angle too small rejections: " + angleTooSmallRejections + "/" + numIterations);
+        Debug.Log("Other rejections: " + rejections + "/" + numIterations);
+        Debug.Log("Change in total angular deviation: " + ((newTotalAngleFromIdeal - totalAngleFromIdeal) / totalAngleFromIdeal * 100) + "%");
 
         return false;
     }
