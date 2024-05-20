@@ -83,8 +83,6 @@ public class AnamorphicMapper : MonoBehaviour {
     private Vector3[] mappedTrianglePositions = null;
     [SerializeField]
     private Vector3[] mappedTriangleNormals = null;
-    // [SerializeField]
-    // private int[] occludedMappedVertexIndices = null;
     [SerializeField]
     private Vector3[] optimizedVertices = null;
     [SerializeField]
@@ -112,8 +110,6 @@ public class AnamorphicMapper : MonoBehaviour {
     private bool showMappedNormals = false;
     [SerializeField]
     private bool showMappedTriangleNormals = false;
-    // [SerializeField]
-    // private bool showOccludedMappedVertices = false;
     [SerializeField]
     private bool showOptimizedVertices = false;
     [SerializeField]
@@ -137,6 +133,18 @@ public class AnamorphicMapper : MonoBehaviour {
         for (int i = 0; i < vertices.Length; i++) {
             globalMeshVertices[i] = originalTransform.TransformPoint(vertices[i]);
             meshNormals[i] = originalTransform.rotation * normals[i];
+        }
+        // Calculate the vertex with minimum depth value
+        float minDepth = float.PositiveInfinity;
+        for (int i = 0; i < globalMeshVertices.Length; i++) {
+            if (globalMeshVertices[i].z < minDepth) {
+                minDepth = globalMeshVertices[i].z;
+            }
+        }
+        // Calculate z-difference relative to this point
+        float[] zOffsets = new float[globalMeshVertices.Length];
+        for (int i = 0; i < zOffsets.Length; i++) {
+            zOffsets[i] = globalMeshVertices[i].z - minDepth;
         }
         // Do the raycasting
         raycastDirections = new Vector3[vertices.Length];
@@ -194,7 +202,7 @@ public class AnamorphicMapper : MonoBehaviour {
         for (int i = 0; i < vertices.Length; i++) {
             int lastReflection = numReflections[i] - 1;
             if (lastReflection < 0) continue;
-            mappedVertices[i] = mirrorHits[i, lastReflection] + scale * vertexDistancesFromMirror[i] * reflections[i, lastReflection];
+            mappedVertices[i] = mirrorHits[i, lastReflection] + scale * (vertexDistancesFromMirror[i] /* + zOffsets[i] */) * reflections[i, lastReflection];
         }
         int[] mappedTriangles = new int[originalMesh.triangles.Length];
         for (int i = 0; i < mappedTriangles.Length; i += 3) {
@@ -383,29 +391,6 @@ public class AnamorphicMapper : MonoBehaviour {
         optimizedNormals = mappedMesh.normals;
         return true;
     }
-
-    private bool CalculateOccludedMappedVertices(out int[] occludedIndices) {
-        // Calculates which reflected vertices are occluded by the mesh. Ended up not all that useful, but it might be useful in some other place, dunno.
-        if (Status == MappingStatus.None) {
-            occludedIndices = null;
-            return false;
-        }
-        List<int> occludedIndicesList = new();
-        for (int i = 0; i < mappedVertices.Length; i++) {
-            int lastReflection = numReflections[i] - 1;
-            if (lastReflection < 0) continue;
-
-            Vector3 origin = mirrorHits[i, lastReflection];
-            Vector3 direction = reflections[i, lastReflection];
-            float raycastDistance = Vector3.Distance(mappedVertices[i], origin) - 0.05f;
-            RaycastHit[] hits = Physics.RaycastAll(origin, direction, raycastDistance, LayerMask.GetMask("Mapped Object"));
-
-            if (hits.Length > 0) occludedIndicesList.Add(i);
-        }
-        occludedIndices = occludedIndicesList.ToArray();
-        return true;
-    }
-
     private Vector3[] CalculateTrianglePositions(Vector3[] vertices, int[] triangles) {
         Vector3[] trianglePositions = new Vector3[triangles.Length / 3];
         for (int i = 0; i < trianglePositions.Length; i++) {
@@ -756,11 +741,6 @@ public class AnamorphicMapper : MonoBehaviour {
     }
 
     public void Optimize() {
-        // if (!CalculateOccludedMappedVertices(out occludedMappedVertexIndices)) {
-        //     Debug.LogError("Error in calculating occluded mapped vertices");
-        //     return;
-        // }
-        // The above turned out not useful at all
         switch (optimizer) {
             case OptimizerMode.XZPlane:
                 if (!OptimizeXZPlane()) return;
@@ -793,7 +773,6 @@ public class AnamorphicMapper : MonoBehaviour {
         mappedNormals = null;
         mappedTrianglePositions = null;
         mappedTriangleNormals = null;
-        // occludedMappedVertexIndices = null;
         optimizedVertices = null;
         optimizedNormals = null;
         GetComponent<MeshFilter>().sharedMesh = null;
@@ -894,16 +873,6 @@ public class AnamorphicMapper : MonoBehaviour {
                 Gizmos.DrawLine(mappedTrianglePositions[i], mappedTrianglePositions[i] + mappedTriangleNormals[i]);
             }
         }
-        // Occluded vertices. Not really used though
-        // Gizmos.color = Color.blue;
-        // if (showOccludedMappedVertices && occludedMappedVertexIndices != null && Status != MappingStatus.None) {
-        //     for (int i = 0; i < occludedMappedVertexIndices.Length; i++) {
-        //         int idx = occludedMappedVertexIndices[i];
-        //         if (idx >= showMin && idx <= showMax) {
-        //             Gizmos.DrawSphere(mappedVertices[idx], GIZMO_SPHERE_RADIUS * 1.1f);
-        //         }
-        //     }
-        // }
         // Mapped vertices after optimization
         Gizmos.color = Color.magenta;
         if (showOptimizedVertices && optimizedVertices != null && Status == MappingStatus.Optimized) {
