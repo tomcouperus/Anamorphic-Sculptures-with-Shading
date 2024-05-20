@@ -10,7 +10,7 @@ public class AnamorphicMapper : MonoBehaviour {
     private const string NORMAL_SHADER_MODE_PROP_NAME = "_Mode";
     private const string NORMAL_SHADER_RELATIVE_PLANE_PROP_NAME = "_RelativePlane";
 
-    private enum OptimizerMode { XZPlane, TriangleNormals, IterativeDescent }
+    private enum OptimizerMode { XZPlane, TriangleNormals, IterativeDescent, OffsetTest }
 
     [Header("Settings")]
     [SerializeField]
@@ -134,18 +134,6 @@ public class AnamorphicMapper : MonoBehaviour {
             globalMeshVertices[i] = originalTransform.TransformPoint(vertices[i]);
             meshNormals[i] = originalTransform.rotation * normals[i];
         }
-        // Calculate the vertex with minimum depth value
-        float minDepth = float.PositiveInfinity;
-        for (int i = 0; i < globalMeshVertices.Length; i++) {
-            if (globalMeshVertices[i].z < minDepth) {
-                minDepth = globalMeshVertices[i].z;
-            }
-        }
-        // Calculate z-difference relative to this point
-        float[] zOffsets = new float[globalMeshVertices.Length];
-        for (int i = 0; i < zOffsets.Length; i++) {
-            zOffsets[i] = globalMeshVertices[i].z - minDepth;
-        }
         // Do the raycasting
         raycastDirections = new Vector3[vertices.Length];
         numReflections = new int[vertices.Length];
@@ -202,7 +190,7 @@ public class AnamorphicMapper : MonoBehaviour {
         for (int i = 0; i < vertices.Length; i++) {
             int lastReflection = numReflections[i] - 1;
             if (lastReflection < 0) continue;
-            mappedVertices[i] = mirrorHits[i, lastReflection] + scale * (vertexDistancesFromMirror[i] /* + zOffsets[i] */) * reflections[i, lastReflection];
+            mappedVertices[i] = mirrorHits[i, lastReflection] + scale * vertexDistancesFromMirror[i] * reflections[i, lastReflection];
         }
         int[] mappedTriangles = new int[originalMesh.triangles.Length];
         for (int i = 0; i < mappedTriangles.Length; i += 3) {
@@ -740,6 +728,36 @@ public class AnamorphicMapper : MonoBehaviour {
         return false;
     }
 
+    private bool OptimizeOffsetTest() {
+        Debug.Log("Applying additional offset ");
+        Mesh mesh = GetComponent<MeshFilter>().sharedMesh;
+
+        // Calculate the vertex with minimum depth value
+        float minDepth = float.PositiveInfinity;
+        for (int i = 0; i < globalMeshVertices.Length; i++) {
+            if (globalMeshVertices[i].z < minDepth) {
+                minDepth = globalMeshVertices[i].z;
+            }
+        }
+        // Calculate z-difference relative to this point
+        float[] zOffsets = new float[globalMeshVertices.Length];
+        for (int i = 0; i < zOffsets.Length; i++) {
+            zOffsets[i] = globalMeshVertices[i].z - minDepth;
+        }
+        optimizedVertices = new Vector3[mappedVertices.Length];
+        for (int i = 0; i < optimizedVertices.Length; i++) {
+            int lastReflection = numReflections[i] - 1;
+            if (lastReflection < 0) continue;
+            optimizedVertices[i] = mirrorHits[i, lastReflection] + scale * (vertexDistancesFromMirror[i] + zOffsets[i]) * reflections[i, lastReflection];
+        }
+        mesh.SetVertices(optimizedVertices);
+        RecalculateNormals(mesh, globalMeshVertices, originalObjects[originalObjectIndex].normalsAreContinuous);
+        UpdateCollider();
+
+        optimizedNormals = mesh.normals;
+        return true;
+    }
+
     public void Optimize() {
         switch (optimizer) {
             case OptimizerMode.XZPlane:
@@ -750,6 +768,9 @@ public class AnamorphicMapper : MonoBehaviour {
                 break;
             case OptimizerMode.IterativeDescent:
                 if (!OptimizeIterativeDescent()) return;
+                break;
+            case OptimizerMode.OffsetTest:
+                if (!OptimizeOffsetTest()) return;
                 break;
             default:
                 Debug.LogError("Optimization mode not implemented.");
