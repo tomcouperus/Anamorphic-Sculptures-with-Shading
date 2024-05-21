@@ -60,3 +60,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   meshIsContinuous: 1
   normalsAreContinuous: 1
+--- !u!135 &6042432534267387940
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3148165454866258814}
+  m_Material: {fileID: 0}
+  m_IsTrigger: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 1
+  m_Center: {x: -0.00000014901161, y: 0, z: 0.000000059604645}

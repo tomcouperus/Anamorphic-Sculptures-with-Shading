@@ -60,3 +60,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   meshIsContinuous: 1
   normalsAreContinuous: 1
+--- !u!64 &6879963613534642455
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 687371373950267230}
+  m_Material: {fileID: 0}
+  m_IsTrigger: 0
+  m_Enabled: 1
+  serializedVersion: 4
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: -462981019419857548, guid: af23d9d9276a74250b800a5103c6d262, type: 3}
