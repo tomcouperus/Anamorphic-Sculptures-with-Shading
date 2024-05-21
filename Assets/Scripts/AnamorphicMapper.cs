@@ -728,6 +728,18 @@ public class AnamorphicMapper : MonoBehaviour {
         return false;
     }
 
+    private float CalculateAngularDeviation(Vector3[] normals, Vector3[] originalNormals) {
+        Vector3[] idealNormals = (Vector3[]) originalNormals.Clone();
+        for (int i = 0; i < idealNormals.Length; i++) {
+            idealNormals[i].z *= -1;
+        }
+        float angularDeviation = 0;
+        for (int i = 0; i < normals.Length; i++) {
+            angularDeviation += Vector3.Angle(idealNormals[i], normals[i]);
+        }
+        return angularDeviation;
+    }
+
     private bool OptimizeOffsetTest() {
         Debug.Log("Applying additional offset ");
         Mesh mesh = GetComponent<MeshFilter>().sharedMesh;
@@ -776,6 +788,8 @@ public class AnamorphicMapper : MonoBehaviour {
                 Debug.LogError("Optimization mode not implemented.");
                 return;
         }
+        Debug.Log("Initial angular deviation: " + CalculateAngularDeviation(mappedNormals, meshNormals));
+        Debug.Log("Optimized angular deviation: " + CalculateAngularDeviation(optimizedNormals, meshNormals));
         Status = MappingStatus.Optimized;
     }
 
