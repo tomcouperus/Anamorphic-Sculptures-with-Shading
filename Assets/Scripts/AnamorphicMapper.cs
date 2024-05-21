@@ -736,16 +736,17 @@ public class AnamorphicMapper : MonoBehaviour {
         Debug.Log("Other rejections: " + rejections + "/" + numIterations);
         Debug.Log("Change in total angular deviation: " + ((newTotalAngleFromIdeal - totalAngleFromIdeal) / totalAngleFromIdeal * 100) + "%");
 
-        return false;
+        return true;
     }
 
-    private float CalculateAngularDeviation(Vector3[] normals, Vector3[] originalNormals) {
+    private float CalculateAngularDeviation(Vector3[] normals, Vector3[] originalNormals, bool[] occluded) {
         Vector3[] idealNormals = (Vector3[]) originalNormals.Clone();
         for (int i = 0; i < idealNormals.Length; i++) {
             idealNormals[i].z *= -1;
         }
         float angularDeviation = 0;
         for (int i = 0; i < normals.Length; i++) {
+            if (occluded[i]) continue;
             angularDeviation += Vector3.Angle(idealNormals[i], normals[i]);
         }
         return angularDeviation;
@@ -799,8 +800,8 @@ public class AnamorphicMapper : MonoBehaviour {
                 Debug.LogError("Optimization mode not implemented.");
                 return;
         }
-        Debug.Log("Initial angular deviation: " + CalculateAngularDeviation(mappedNormals, meshNormals));
-        Debug.Log("Optimized angular deviation: " + CalculateAngularDeviation(optimizedNormals, meshNormals));
+        Debug.Log("Initial angular deviation: " + CalculateAngularDeviation(mappedNormals, meshNormals, occludedVertices));
+        Debug.Log("Optimized angular deviation: " + CalculateAngularDeviation(optimizedNormals, meshNormals, occludedVertices));
         Status = MappingStatus.Optimized;
     }
 
