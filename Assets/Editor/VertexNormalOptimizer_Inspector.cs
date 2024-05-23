@@ -1,0 +1,26 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEditor;
+using UnityEngine;
+[CustomEditor(typeof(VertexNormalOptimizer))]
+public class VertexNormalOptimizer_Inspector : Editor {
+    public override void OnInspectorGUI() {
+        base.OnInspectorGUI();
+        VertexNormalOptimizer vertexNormalOptimizer = (VertexNormalOptimizer) target;
+
+        if (vertexNormalOptimizer.Status == VertexNormalOptimizer.OptimizerStatus.None) {
+            if (GUILayout.Button("Deform")) {
+                vertexNormalOptimizer.Deform();
+            }
+        }
+        if (vertexNormalOptimizer.Status == VertexNormalOptimizer.OptimizerStatus.Deformed) {
+            if (GUILayout.Button("Optimize")) {
+                vertexNormalOptimizer.Optimize();
+            }
+        }
+        if (GUILayout.Button("Reset")) {
+            vertexNormalOptimizer.Reset();
+        }
+
+    }
+}
