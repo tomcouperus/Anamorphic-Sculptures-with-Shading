@@ -216,7 +216,7 @@ public class AnamorphicMapper : MonoBehaviour {
         // Send the original normals to the shader as uv values;
         // Using uv 3, since unity doc says that 1 and 2 can be used for various lightmaps
         mappedMesh.SetUVs(3, meshNormals);
-        RecalculateNormals(mappedMesh, vertices, originalObjects[originalObjectIndex].normalsAreContinuous);
+        RecalculateNormals(mappedMesh, vertices, originalObjects[originalObjectIndex].useSmoothShading);
 
         GetComponent<MeshFilter>().sharedMesh = mappedMesh;
 
@@ -383,7 +383,7 @@ public class AnamorphicMapper : MonoBehaviour {
         }
 
         mappedMesh.SetVertices(optimizedVertices);
-        RecalculateNormals(mappedMesh, originalVertices, originalObjects[originalObjectIndex].normalsAreContinuous);
+        RecalculateNormals(mappedMesh, originalVertices, originalObjects[originalObjectIndex].useSmoothShading);
 
         UpdateCollider();
 
@@ -605,7 +605,7 @@ public class AnamorphicMapper : MonoBehaviour {
 
         // Set the vertices and update normals and colliders.
         mappedMesh.SetVertices(optimizedVertices);
-        RecalculateNormals(mappedMesh, vertices, originalObjects[originalObjectIndex].normalsAreContinuous);
+        RecalculateNormals(mappedMesh, vertices, originalObjects[originalObjectIndex].useSmoothShading);
 
         UpdateCollider();
 
@@ -697,7 +697,7 @@ public class AnamorphicMapper : MonoBehaviour {
             // TODO figure out local calculation. First attempt did not match exactly, so postponed in favour of proof of concept
             proposedMesh.SetVertices(proposedVertices);
             proposedMesh.SetTriangles(mesh.triangles, 0);
-            RecalculateNormals(proposedMesh, proposedVertices, originalObjects[originalObjectIndex].normalsAreContinuous);
+            RecalculateNormals(proposedMesh, proposedVertices, originalObjects[originalObjectIndex].useSmoothShading);
             Vector3[] proposedNormals = proposedMesh.normals;
             float proposedTotalAngleFromIdeal = 0;
             for (int i = 0; i < idealVertexNormals.Length; i++) {
@@ -775,7 +775,7 @@ public class AnamorphicMapper : MonoBehaviour {
             optimizedVertices[i] = mirrorHits[i, lastReflection] + scale * (vertexDistancesFromMirror[i] + zOffsets[i]) * reflections[i, lastReflection];
         }
         mesh.SetVertices(optimizedVertices);
-        RecalculateNormals(mesh, globalMeshVertices, originalObjects[originalObjectIndex].normalsAreContinuous);
+        RecalculateNormals(mesh, globalMeshVertices, originalObjects[originalObjectIndex].useSmoothShading);
         UpdateCollider();
 
         optimizedNormals = mesh.normals;

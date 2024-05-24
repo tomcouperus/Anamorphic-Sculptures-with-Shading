@@ -46,20 +46,6 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 352f24f4631c248278ed9a0650a6221d, type: 3}
   m_PrefabInstance: {fileID: 2842314647287670319}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &4515524526482091557
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3148165454866258814}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: faa73673f3002469abb2128705272c46, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  meshIsContinuous: 1
-  normalsAreContinuous: 1
 --- !u!135 &6042432534267387940
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -73,3 +59,17 @@ SphereCollider:
   serializedVersion: 2
   m_Radius: 1
   m_Center: {x: -0.00000014901161, y: 0, z: 0.000000059604645}
+--- !u!114 &4515524526482091557
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3148165454866258814}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: faa73673f3002469abb2128705272c46, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  meshIsContinuous: 1
+  useSmoothShading: 1

@@ -8,7 +8,11 @@ public class VertexNormalOptimizer_Inspector : Editor {
         base.OnInspectorGUI();
         VertexNormalOptimizer vertexNormalOptimizer = (VertexNormalOptimizer) target;
 
-        if (vertexNormalOptimizer.Status == VertexNormalOptimizer.OptimizerStatus.None) {
+        if (GUILayout.Button("Initialize")) {
+            vertexNormalOptimizer.Initialize();
+        }
+
+        if (vertexNormalOptimizer.Status == VertexNormalOptimizer.OptimizerStatus.Initialized) {
             if (GUILayout.Button("Deform")) {
                 vertexNormalOptimizer.Deform();
             }

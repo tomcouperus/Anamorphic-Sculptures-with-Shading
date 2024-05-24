@@ -53,7 +53,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: c7480efa9144449a9b730cdd9f771d30, type: 3}
       propertyPath: m_Name
-      value: Tetrahedron Variant
+      value: Tetrahedron
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: c7480efa9144449a9b730cdd9f771d30, type: 3}
       propertyPath: m_Layer
@@ -79,4 +79,4 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   meshIsContinuous: 1
-  normalsAreContinuous: 1
+  useSmoothShading: 1
