@@ -12,6 +12,8 @@ public class VertexNormalOptimizer : MonoBehaviour {
     [SerializeField]
     private Transform viewTransform;
     [SerializeField]
+    private int seed = 0;
+    [SerializeField]
     private float minOptimizeOffset = -5;
     [SerializeField]
     private float maxOptimizeOffset = 5;
@@ -35,7 +37,6 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private Vector3[] deformedVertices;
     private Vector3[] deformedNormals;
     private float[] deformedAdjustmentDistances;
-    [SerializeField]
     private float[] deformedAngularDeviations;
     private readonly Color GIZMOS_DEFORMED_COLOR = Color.blue;
 
@@ -72,6 +73,8 @@ public class VertexNormalOptimizer : MonoBehaviour {
     // MAIN METHODS
     public void Initialize() {
         Debug.Log("Initializing");
+        // Initialize the random number generator
+        UnityEngine.Random.InitState(seed);
 
         // Translate the original points to global space and obtain the adjustment rays
         originalMesh = originalObject.GetComponent<MeshFilter>().sharedMesh;
@@ -97,7 +100,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         SwitchMesh();
     }
     public void Deform() {
-        if (Status != OptimizerStatus.Initialized) return;
+        // if (Status != OptimizerStatus.Initialized) return;
         Debug.Log("Deforming mesh");
 
         // Apply a deformation to the original mesh by adjusting the distance along the rays
@@ -108,11 +111,9 @@ public class VertexNormalOptimizer : MonoBehaviour {
         Dictionary<Vector3, List<int>> verticesByPosition = GroupVerticesByLocation(originalVertices);
         foreach ((Vector3 position, List<int> identicalVertices) in verticesByPosition) {
             // Determine the new distance
-            float newDistance = originalAdjustmentDistances[identicalVertices[0]];
-            if (identicalVertices.Contains(selectedVertex)) {
-                newDistance *= 1.1f;
-            }
-            // Apply it to all vertices
+            float offset = UnityEngine.Random.Range(-1f, 1f);
+            float newDistance = originalAdjustmentDistances[identicalVertices[0]] + offset;
+            // Apply it to all identical vertices
             foreach (int vi in identicalVertices) {
                 deformedVertices[vi] = viewPosition + adjustmentRays[vi] * newDistance;
                 deformedAdjustmentDistances[vi] = newDistance;
@@ -137,7 +138,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     }
 
     public void Optimize() {
-        if (Status != OptimizerStatus.Deformed) return;
+        // if (Status != OptimizerStatus.Deformed) return;
         Debug.Log("Optimizing vertex normals");
 
         // Make a list of various offsets
