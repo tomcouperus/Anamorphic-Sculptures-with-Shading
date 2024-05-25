@@ -17,8 +17,9 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private float maxOptimizeOffset = 5;
     [SerializeField]
     private float optimizeOffsetStep = 0.1f;
-
-    private const int DEFORM_INDEX = 3;
+    [SerializeField]
+    private int selectedVertex = 0;
+    private readonly Color GIZMOS_SELECTED_COLOR = Color.green;
 
     [Header("Status: Initialized -- variables")]
     private Mesh originalMesh;
@@ -27,6 +28,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private Vector3[] originalNormals;
     private Vector3[] adjustmentRays;
     private float[] originalAdjustmentDistances;
+    private readonly Color GIZMOS_INITIALIZED_COLOR = Color.white;
 
     [Header("Status: Deformed -- variables")]
     private Mesh deformedMesh;
@@ -35,6 +37,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private float[] deformedAdjustmentDistances;
     [SerializeField]
     private float[] deformedAngularDeviations;
+    private readonly Color GIZMOS_DEFORMED_COLOR = Color.blue;
 
     [Header("Status: Optimized -- variables")]
     private Mesh optimizedMesh;
@@ -43,6 +46,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private float[] optimizedAdjustmentDistances;
     private float[] optimizedAngularDeviations;
     private Dictionary<float, float> offsetDeviationMap;
+    private readonly Color GIZMOS_OPTIMIZED_COLOR = Color.magenta;
 
 
     private const float GIZMO_SPHERE_RADIUS = 0.05f;
@@ -102,11 +106,10 @@ public class VertexNormalOptimizer : MonoBehaviour {
         Vector3 viewPosition = viewTransform.position;
         // But only deform the unique vertices
         Dictionary<Vector3, List<int>> verticesByPosition = GroupVerticesByLocation(originalVertices);
-        int i = 0;
         foreach ((Vector3 position, List<int> identicalVertices) in verticesByPosition) {
             // Determine the new distance
             float newDistance = originalAdjustmentDistances[identicalVertices[0]];
-            if (i == DEFORM_INDEX) {
+            if (identicalVertices.Contains(selectedVertex)) {
                 newDistance *= 1.1f;
             }
             // Apply it to all vertices
@@ -114,7 +117,6 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 deformedVertices[vi] = viewPosition + adjustmentRays[vi] * newDistance;
                 deformedAdjustmentDistances[vi] = newDistance;
             }
-            i++;
         }
 
         // Apply it to a new mesh
@@ -165,11 +167,10 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
         // Loop over all the offsets, and adjust the chosen vertex
         foreach (float offset in offsets) {
-            int i = 0;
             foreach ((Vector3 position, List<int> identicalVertices) in verticesByPosition) {
                 // Determine the new distance
                 float newDistance = deformedAdjustmentDistances[identicalVertices[0]];
-                if (i == DEFORM_INDEX) {
+                if (identicalVertices.Contains(selectedVertex)) {
                     newDistance += offset;
                 }
                 // Apply it to all vertices
@@ -177,7 +178,6 @@ public class VertexNormalOptimizer : MonoBehaviour {
                     optimizedVertices[vi] = viewPosition + adjustmentRays[vi] * newDistance;
                     optimizedAdjustmentDistances[vi] = newDistance;
                 }
-                i++;
             }
             // Update the vertices in the mesh
             optimizedMesh.SetVertices(optimizedVertices);
@@ -315,12 +315,16 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private void DrawInitializedGizmos() {
         // Every debug feature that requires Initialized or higher status
         if (Status < OptimizerStatus.Initialized) return;
-        Gizmos.color = Color.white;
+        Gizmos.color = GIZMOS_INITIALIZED_COLOR;
 
         if (showOriginalVertices) {
             for (int i = 0; i < originalVertices.Length; i++) {
+                if (i == selectedVertex) continue;
                 Gizmos.DrawSphere(originalVertices[i], GIZMO_SPHERE_RADIUS);
             }
+            Gizmos.color = GIZMOS_SELECTED_COLOR;
+            Gizmos.DrawSphere(originalVertices[selectedVertex], GIZMO_SPHERE_RADIUS);
+            Gizmos.color = GIZMOS_INITIALIZED_COLOR;
         }
         if (showOriginalNormals) {
             for (int i = 0; i < originalNormals.Length; i++) {
@@ -337,11 +341,15 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private void DrawDeformedGizmos() {
         // Every debug feature that requires Deformed or higher status
         if (Status < OptimizerStatus.Deformed) return;
-        Gizmos.color = Color.blue;
+        Gizmos.color = GIZMOS_DEFORMED_COLOR;
         if (showDeformedVertices) {
             for (int i = 0; i < deformedVertices.Length; i++) {
+                if (i == selectedVertex) continue;
                 Gizmos.DrawSphere(deformedVertices[i], GIZMO_SPHERE_RADIUS * 1.5f);
             }
+            Gizmos.color = GIZMOS_SELECTED_COLOR;
+            Gizmos.DrawSphere(deformedVertices[selectedVertex], GIZMO_SPHERE_RADIUS * 1.5f);
+            Gizmos.color = GIZMOS_DEFORMED_COLOR;
         }
         if (showDeformedNormals) {
             for (int i = 0; i < deformedNormals.Length; i++) {
@@ -353,7 +361,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private void DrawOptimizedGizmos() {
         // Every debug feature that requires Optimized or higher status
         if (Status < OptimizerStatus.Optimized) return;
-        Gizmos.color = Color.green;
+        Gizmos.color = GIZMOS_OPTIMIZED_COLOR;
         if (showOffsetDeviationMap) {
             foreach ((float offset, float deviation) in offsetDeviationMap) {
                 Gizmos.DrawSphere(new Vector3(5, deviation / 20, offset), GIZMO_SPHERE_RADIUS * 3);
@@ -369,6 +377,8 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
     // INPUT CHECKER
     private void OnValidate() {
+        if (originalMesh != null && selectedVertex >= originalMesh.vertexCount) selectedVertex = originalMesh.vertexCount - 1;
+        if (selectedVertex < 0) selectedVertex = 0;
         if (minOptimizeOffset >= maxOptimizeOffset) minOptimizeOffset = maxOptimizeOffset - optimizeOffsetStep;
     }
 #endif
