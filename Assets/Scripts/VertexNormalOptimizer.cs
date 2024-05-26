@@ -6,22 +6,23 @@ using UnityEngine;
 
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class VertexNormalOptimizer : MonoBehaviour {
-    [Header("Settings")]
+    [Header("General Settings")]
     [SerializeField]
     private MappableObject originalObject;
     [SerializeField]
     private Transform viewTransform;
     [SerializeField]
     private int seed = 0;
+    [Header("Optimizer Settings")]
+    [SerializeField]
+    private int iterations = 1;
+    private const int MAX_ITERATIONS = 100;
     [SerializeField]
     private float minOptimizeOffset = -5;
     [SerializeField]
     private float maxOptimizeOffset = 5;
     [SerializeField]
     private float optimizeOffsetStep = 0.1f;
-    [SerializeField]
-    private int selectedVertex = 0;
-    private readonly Color GIZMOS_SELECTED_COLOR = Color.green;
 
     [Header("Status: Initialized -- variables")]
     private Mesh originalMesh;
@@ -36,7 +37,9 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private Mesh deformedMesh;
     private Vector3[] deformedVertices;
     private Vector3[] deformedNormals;
+    [SerializeField]
     private float[] deformedAdjustmentDistances;
+    [SerializeField]
     private float[] deformedAngularDeviations;
     private readonly Color GIZMOS_DEFORMED_COLOR = Color.blue;
 
@@ -44,14 +47,18 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private Mesh optimizedMesh;
     private Vector3[] optimizedVertices;
     private Vector3[] optimizedNormals;
+    [SerializeField]
     private float[] optimizedAdjustmentDistances;
+    [SerializeField]
     private float[] optimizedAngularDeviations;
-    private Dictionary<float, float> offsetDeviationMap;
     private readonly Color GIZMOS_OPTIMIZED_COLOR = Color.magenta;
 
 
     private const float GIZMO_SPHERE_RADIUS = 0.05f;
     [Header("Debug")]
+    [SerializeField]
+    private int selectedVertex = 0;
+    private readonly Color GIZMOS_SELECTED_COLOR = Color.green;
     [SerializeField]
     private bool showOriginalVertices = false;
     [SerializeField]
@@ -60,12 +67,16 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private bool showAdjustmentRays = false;
     [SerializeField]
     private float adjustmentRaysScale = 10;
+
     [SerializeField]
     private bool showDeformedVertices = false;
     [SerializeField]
     private bool showDeformedNormals = false;
+
     [SerializeField]
-    private bool showOffsetDeviationMap = false;
+    private bool showOptimizedVertices = false;
+    [SerializeField]
+    private bool showOptimizedNormals = false;
 
     public enum OptimizerStatus { None, Initialized, Deformed, Optimized };
     public OptimizerStatus Status { get; private set; } = OptimizerStatus.None;
@@ -142,51 +153,101 @@ public class VertexNormalOptimizer : MonoBehaviour {
         Debug.Log("Optimizing vertex normals");
 
         // Make a list of various offsets
-        offsetDeviationMap = new();
+        Dictionary<float, float> offsetTotalDeviationMap = new();
         float minOffset = -5;
         float maxOffset = 5;
         float offsetStep = 0.1f;
+        List<float> offsets = new();
         for (float offset = minOffset; offset <= maxOffset; offset += offsetStep) {
-            offsetDeviationMap.Add(offset, -1);
+            offsets.Add(offset);
+            offsetTotalDeviationMap.Add(offset, -1);
         }
-        List<float> offsets = new(offsetDeviationMap.Keys);
-        offsets.Sort();
-
 
         // Optimize the deformed mesh by adjusting the distance along the rays
-        optimizedVertices = new Vector3[adjustmentRays.Length];
-        optimizedAdjustmentDistances = new float[adjustmentRays.Length];
+        // Initialize variables
+        optimizedVertices = (Vector3[]) deformedVertices.Clone();
+        optimizedAdjustmentDistances = (float[]) deformedAdjustmentDistances.Clone();
+        optimizedAngularDeviations = (float[]) deformedAngularDeviations.Clone();
 
-        // Initialize the mesh
+        Vector3 viewPosition = viewTransform.position;
+
+        // Initialize mesh
         optimizedMesh = new();
         optimizedMesh.SetVertices(optimizedVertices);
         optimizedMesh.SetTriangles(originalMesh.triangles, 0);
 
-        Vector3 viewPosition = viewTransform.position;
-        // But only optimize the unique vertices
+        // Only optimize the unique vertices
         Dictionary<Vector3, List<int>> verticesByPosition = GroupVerticesByLocation(originalVertices);
 
-        // Loop over all the offsets, and adjust the chosen vertex
-        foreach (float offset in offsets) {
-            foreach ((Vector3 position, List<int> identicalVertices) in verticesByPosition) {
-                // Determine the new distance
-                float newDistance = deformedAdjustmentDistances[identicalVertices[0]];
-                if (identicalVertices.Contains(selectedVertex)) {
-                    newDistance += offset;
-                }
-                // Apply it to all vertices
-                foreach (int vi in identicalVertices) {
-                    optimizedVertices[vi] = viewPosition + adjustmentRays[vi] * newDistance;
-                    optimizedAdjustmentDistances[vi] = newDistance;
+        // Sort the optimized angular deviations
+        Dictionary<int, float> optimizedAngularDeviationsMap = new();
+        for (int i = 0; i < optimizedVertices.Length; i++) {
+            optimizedAngularDeviationsMap.Add(i, deformedAngularDeviations[i]);
+        }
+        List<KeyValuePair<int, float>> sortedOptimizedAngularDeviations = optimizedAngularDeviationsMap.ToList();
+        sortedOptimizedAngularDeviations.Sort(SortFunctions.largeToSmallValueSorter);
+        foreach ((int v, float deviation) in sortedOptimizedAngularDeviations) {
+            Debug.Log(v + ": " + deviation);
+        }
+
+        // For a number of iterations, optimize the vertex that has the largest angular deviation
+        for (int i = 0; i < iterations; i++) {
+            int v = sortedOptimizedAngularDeviations[0].Key;
+            Debug.Log("Iteration: " + i + ", vertex: " + v);
+
+            // Find the set of identical vertices containing v
+            List<int> identicalVertices = null;
+            foreach ((Vector3 _, List<int> ivs) in verticesByPosition) {
+                if (ivs.Contains(v)) {
+                    identicalVertices = ivs;
+                    break;
                 }
             }
-            // Update the vertices in the mesh
+
+            // Go over all the offsets
+            foreach (float offset in offsets) {
+                // Determine the new distance and position
+                float newDistance = optimizedAdjustmentDistances[v] + offset;
+                Vector3 newVertexPosition = viewPosition + adjustmentRays[v] * newDistance;
+                // Update all identical vertices
+                foreach (int vi in identicalVertices) {
+                    optimizedVertices[vi] = newVertexPosition;
+                }
+
+                // Recalculate the normals for this offset
+                optimizedMesh.SetVertices(optimizedVertices);
+                RecalculateNormals(optimizedMesh, originalObject.useSmoothShading);
+                // Calculate the new total deviation and store it
+                float[] deviations = CalculateAngularDeviation(originalNormals, optimizedMesh.normals);
+                offsetTotalDeviationMap[offset] = Enumerable.Sum(deviations);
+            }
+
+            // Determine the offset with minimum total deviation
+            List<KeyValuePair<float, float>> sortedOffsetTotalDeviations = offsetTotalDeviationMap.ToList();
+            sortedOffsetTotalDeviations.Sort(SortFunctions.smallToLargeValueSorter);
+
+            // Apply this optimal offset to all identical vertices
+            float optimalDistance = optimizedAdjustmentDistances[v] + sortedOffsetTotalDeviations[0].Key;
+            Vector3 optimalVertexPosition = viewPosition + adjustmentRays[v] * optimalDistance;
+            foreach (int vi in identicalVertices) {
+                optimizedVertices[vi] = optimalVertexPosition;
+                optimizedAdjustmentDistances[vi] = optimalDistance;
+            }
             optimizedMesh.SetVertices(optimizedVertices);
             RecalculateNormals(optimizedMesh, originalObject.useSmoothShading);
             optimizedNormals = optimizedMesh.normals;
-            // Calculate the new deviation and store it
-            float[] deviations = CalculateAngularDeviation(originalNormals, optimizedNormals);
-            offsetDeviationMap[offset] = Enumerable.Sum(deviations);
+
+            // Resort the vertices according to their new deviations
+            optimizedAngularDeviations = CalculateAngularDeviation(originalNormals, optimizedNormals);
+            for (int vi = 0; vi < optimizedVertices.Length; vi++) {
+                optimizedAngularDeviationsMap[vi] = optimizedAngularDeviations[vi];
+            }
+            sortedOptimizedAngularDeviations = optimizedAngularDeviationsMap.ToList();
+            sortedOptimizedAngularDeviations.Sort(SortFunctions.largeToSmallValueSorter);
+            foreach ((int vi, float deviation) in sortedOptimizedAngularDeviations) {
+                Debug.Log(vi + ": " + deviation);
+            }
+
         }
 
         // Update status
@@ -209,6 +270,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         deformedVertices = null;
         deformedNormals = null;
         deformedAdjustmentDistances = null;
+        deformedAngularDeviations = null;
 
         // Status: Optimized -- variables
         optimizedMesh = null;
@@ -216,7 +278,6 @@ public class VertexNormalOptimizer : MonoBehaviour {
         optimizedNormals = null;
         optimizedAdjustmentDistances = null;
         optimizedAngularDeviations = null;
-        offsetDeviationMap = null;
 
         // Update status
         Status = OptimizerStatus.None;
@@ -363,9 +424,18 @@ public class VertexNormalOptimizer : MonoBehaviour {
         // Every debug feature that requires Optimized or higher status
         if (Status < OptimizerStatus.Optimized) return;
         Gizmos.color = GIZMOS_OPTIMIZED_COLOR;
-        if (showOffsetDeviationMap) {
-            foreach ((float offset, float deviation) in offsetDeviationMap) {
-                Gizmos.DrawSphere(new Vector3(5, deviation / 20, offset), GIZMO_SPHERE_RADIUS * 3);
+        if (showOptimizedVertices) {
+            for (int i = 0; i < optimizedVertices.Length; i++) {
+                if (i == selectedVertex) continue;
+                Gizmos.DrawSphere(optimizedVertices[i], GIZMO_SPHERE_RADIUS * 1.5f);
+            }
+            Gizmos.color = GIZMOS_SELECTED_COLOR;
+            Gizmos.DrawSphere(optimizedVertices[selectedVertex], GIZMO_SPHERE_RADIUS * 1.5f);
+            Gizmos.color = GIZMOS_OPTIMIZED_COLOR;
+        }
+        if (showOptimizedNormals) {
+            for (int i = 0; i < optimizedNormals.Length; i++) {
+                Gizmos.DrawLine(optimizedVertices[i], optimizedVertices[i] + optimizedNormals[i]);
             }
         }
     }
@@ -378,6 +448,8 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
     // INPUT CHECKER
     private void OnValidate() {
+        if (iterations < 1) iterations = 1;
+        if (iterations > MAX_ITERATIONS) iterations = MAX_ITERATIONS;
         if (originalMesh != null && selectedVertex >= originalMesh.vertexCount) selectedVertex = originalMesh.vertexCount - 1;
         if (selectedVertex < 0) selectedVertex = 0;
         if (minOptimizeOffset >= maxOptimizeOffset) minOptimizeOffset = maxOptimizeOffset - optimizeOffsetStep;
