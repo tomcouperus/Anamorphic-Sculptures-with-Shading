@@ -166,6 +166,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         // Optimize the deformed mesh by adjusting the distance along the rays
         // Initialize variables
         optimizedVertices = (Vector3[]) deformedVertices.Clone();
+        optimizedNormals = (Vector3[]) deformedNormals.Clone();
         optimizedAdjustmentDistances = (float[]) deformedAdjustmentDistances.Clone();
         optimizedAngularDeviations = (float[]) deformedAngularDeviations.Clone();
 
@@ -191,9 +192,15 @@ public class VertexNormalOptimizer : MonoBehaviour {
         }
 
         // For a number of iterations, optimize the vertex that has the largest angular deviation
+        int skipAmount = 0;
         for (int i = 0; i < iterations; i++) {
-            int v = sortedOptimizedAngularDeviations[0].Key;
+            if (skipAmount >= sortedOptimizedAngularDeviations.Count) {
+                Debug.LogWarning("Skipped all vertices. Halting optimization");
+                break;
+            }
+            int v = sortedOptimizedAngularDeviations[skipAmount].Key;
             Debug.Log("Iteration: " + i + ", vertex: " + v);
+            Vector3[] newVertices = (Vector3[]) optimizedVertices.Clone();
 
             // Find the set of identical vertices containing v
             List<int> identicalVertices = null;
@@ -211,11 +218,11 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 Vector3 newVertexPosition = viewPosition + adjustmentRays[v] * newDistance;
                 // Update all identical vertices
                 foreach (int vi in identicalVertices) {
-                    optimizedVertices[vi] = newVertexPosition;
+                    newVertices[vi] = newVertexPosition;
                 }
 
                 // Recalculate the normals for this offset
-                optimizedMesh.SetVertices(optimizedVertices);
+                optimizedMesh.SetVertices(newVertices);
                 RecalculateNormals(optimizedMesh, originalObject.useSmoothShading);
                 // Calculate the new total deviation and store it
                 float[] deviations = CalculateAngularDeviation(originalNormals, optimizedMesh.normals);
@@ -229,14 +236,26 @@ public class VertexNormalOptimizer : MonoBehaviour {
             // Apply this optimal offset to all identical vertices
             float optimalDistance = optimizedAdjustmentDistances[v] + sortedOffsetTotalDeviations[0].Key;
             Vector3 optimalVertexPosition = viewPosition + adjustmentRays[v] * optimalDistance;
-            foreach (int vi in identicalVertices) {
-                optimizedVertices[vi] = optimalVertexPosition;
-                optimizedAdjustmentDistances[vi] = optimalDistance;
+            bool skip = false;
+            if (optimalVertexPosition == optimizedVertices[v]) {
+                Debug.Log("Optimal position already attained");
+                skip = true;
+            } else {
+                skip = false;
+                foreach (int vi in identicalVertices) {
+                    optimizedVertices[vi] = optimalVertexPosition;
+                    optimizedAdjustmentDistances[vi] = optimalDistance;
+                }
             }
             optimizedMesh.SetVertices(optimizedVertices);
             RecalculateNormals(optimizedMesh, originalObject.useSmoothShading);
+            if (skip) {
+                skipAmount++;
+                continue;
+            } else {
+                skipAmount = 0;
+            }
             optimizedNormals = optimizedMesh.normals;
-
             // Resort the vertices according to their new deviations
             optimizedAngularDeviations = CalculateAngularDeviation(originalNormals, optimizedNormals);
             for (int vi = 0; vi < optimizedVertices.Length; vi++) {
@@ -244,9 +263,9 @@ public class VertexNormalOptimizer : MonoBehaviour {
             }
             sortedOptimizedAngularDeviations = optimizedAngularDeviationsMap.ToList();
             sortedOptimizedAngularDeviations.Sort(SortFunctions.largeToSmallValueSorter);
-            foreach ((int vi, float deviation) in sortedOptimizedAngularDeviations) {
-                Debug.Log(vi + ": " + deviation);
-            }
+            // foreach ((int vi, float deviation) in sortedOptimizedAngularDeviations) {
+            //     Debug.Log(vi + ": " + deviation);
+            // }
 
         }
 
