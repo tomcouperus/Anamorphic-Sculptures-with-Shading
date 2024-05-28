@@ -90,7 +90,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         UnityEngine.Random.InitState(seed);
 
         // Translate the original points to global space and obtain the adjustment rays
-        originalMesh = originalObject.mesh;
+        originalMesh = originalObject.sharedMesh;
         Vector3[] localOriginalVertices = originalMesh.vertices;
         originalVertices = new Vector3[localOriginalVertices.Length];
         Vector3 viewPosition = viewTransform.position;
