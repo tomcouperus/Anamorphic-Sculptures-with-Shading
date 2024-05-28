@@ -15,9 +15,14 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private Transform viewTransform;
     [SerializeField]
     private int seed = 0;
+
     [Header("Optimizer Settings")]
     [SerializeField]
     private int iterations = 1;
+    public bool ManualOptimizeSteps = false;
+    private Func<int, int> doOptimizerStep;
+    [SerializeField]
+    private int currentIteration = 0;
     private const int MAX_ITERATIONS = 100;
     [SerializeField]
     private float minOptimizeOffset = -5;
@@ -28,7 +33,6 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
     [Header("Status: Initialized -- variables")]
     private Mesh originalMesh;
-    [SerializeField]
     private Vector3[] originalVertices;
     private Vector3[] originalNormals;
     private Vector3[] adjustmentRays;
@@ -39,9 +43,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private Mesh deformedMesh;
     private Vector3[] deformedVertices;
     private Vector3[] deformedNormals;
-    [SerializeField]
     private float[] deformedAdjustmentDistances;
-    [SerializeField]
     private float[] deformedAngularDeviations;
     private readonly Color GIZMOS_DEFORMED_COLOR = Color.blue;
 
@@ -49,10 +51,9 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private Mesh optimizedMesh;
     private Vector3[] optimizedVertices;
     private Vector3[] optimizedNormals;
-    [SerializeField]
     private float[] optimizedAdjustmentDistances;
-    [SerializeField]
     private float[] optimizedAngularDeviations;
+    private Dictionary<float, float> offsetTotalDeviationMap;
     private readonly Color GIZMOS_OPTIMIZED_COLOR = Color.magenta;
 
 
@@ -152,10 +153,27 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
     public void Optimize() {
         // if (Status != OptimizerStatus.Deformed) return;
+
+        // If doing manual stepping and optimization is set up, just execute one step, until you reach the maximum specified
+        if (ManualOptimizeSteps && currentIteration > 0 && currentIteration < iterations) {
+            int result = doOptimizerStep(currentIteration);
+            // If the optimization can't go further, pretend this was the last iteration
+            if (result == 2) currentIteration = iterations - 1;
+            // On the last iteration, print the nice message
+            if (currentIteration == iterations - 1) {
+                Debug.Log("Angular deviation: " + Enumerable.Sum(optimizedAngularDeviations));
+            }
+            currentIteration++;
+            return;
+        }
+        // Otherwise, if not manually stepping, execute all steps.
+        // If manual stepping, do all initialization, and do 1 step.
+
         Debug.Log("Optimizing vertex normals");
+        currentIteration = 0;
 
         // Make a list of various offsets
-        Dictionary<float, float> offsetTotalDeviationMap = new();
+        offsetTotalDeviationMap = new();
         float minOffset = -5;
         float maxOffset = 5;
         float offsetStep = 0.1f;
@@ -195,10 +213,12 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
         // For a number of iterations, optimize the vertex that has the largest angular deviation
         int skipAmount = 0;
-        for (int i = 0; i < iterations; i++) {
+
+        // Returns 0 if no problem in the iteration, 1 if a vertex was skipped, 2 if all vertices have been skipped and loop should halt.
+        doOptimizerStep = (int i) => {
             if (skipAmount >= sortedOptimizedAngularDeviations.Count) {
                 Debug.LogWarning("Skipped all vertices. Halting optimization");
-                break;
+                return 2;
             }
             int v = sortedOptimizedAngularDeviations[skipAmount].Key;
             Debug.Log("Iteration: " + i + ", vertex: " + v);
@@ -253,7 +273,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
             RecalculateNormals(optimizedMesh, useSmoothShading);
             if (skip) {
                 skipAmount++;
-                continue;
+                return 1;
             } else {
                 skipAmount = 0;
             }
@@ -268,10 +288,19 @@ public class VertexNormalOptimizer : MonoBehaviour {
             // foreach ((int vi, float deviation) in sortedOptimizedAngularDeviations) {
             //     Debug.Log(vi + ": " + deviation);
             // }
+            return 0;
+        };
 
+        if (ManualOptimizeSteps) {
+            doOptimizerStep(currentIteration);
+            currentIteration++;
+        } else {
+            for (int i = 0; i < iterations; i++) {
+                int result = doOptimizerStep(i);
+                if (result == 2) break;
+            }
+            Debug.Log("Angular deviation: " + Enumerable.Sum(optimizedAngularDeviations));
         }
-        Debug.Log("Angular deviation: " + Enumerable.Sum(optimizedAngularDeviations));
-
         // Update status
         Status = OptimizerStatus.Optimized;
         SwitchMesh();
@@ -300,6 +329,8 @@ public class VertexNormalOptimizer : MonoBehaviour {
         optimizedNormals = null;
         optimizedAdjustmentDistances = null;
         optimizedAngularDeviations = null;
+        offsetTotalDeviationMap = null;
+        doOptimizerStep = null;
 
         // Update status
         Status = OptimizerStatus.None;
