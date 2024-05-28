@@ -21,7 +21,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private int iterations = 1;
     public bool ManualOptimizeSteps = false;
     private int currentIteration = 0;
-    private const int MAX_ITERATIONS = 100;
+    private const int MAX_ITERATIONS = 1000;
     [SerializeField]
     private float minOptimizeOffset = -5;
     [SerializeField]
@@ -149,6 +149,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         Debug.Log("Angular deviation: " + Enumerable.Sum(deformedAngularDeviations));
 
         // Update status
+        currentIteration = 0;
         Status = OptimizerStatus.Deformed;
         SwitchMesh();
     }
@@ -172,7 +173,6 @@ public class VertexNormalOptimizer : MonoBehaviour {
         // If manual stepping, do all initialization, and do 1 step.
 
         Debug.Log("Optimizing vertex normals");
-        currentIteration = 0;
 
         // Make a list of various offsets
         offsetTotalDeviationMap = new();
