@@ -8,7 +8,9 @@ using UnityEngine;
 public class VertexNormalOptimizer : MonoBehaviour {
     [Header("General Settings")]
     [SerializeField]
-    private MappableObject originalObject;
+    private MeshFilter originalObject;
+    [SerializeField]
+    private bool useSmoothShading;
     [SerializeField]
     private Transform viewTransform;
     [SerializeField]
@@ -88,7 +90,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         UnityEngine.Random.InitState(seed);
 
         // Translate the original points to global space and obtain the adjustment rays
-        originalMesh = originalObject.GetComponent<MeshFilter>().sharedMesh;
+        originalMesh = originalObject.mesh;
         Vector3[] localOriginalVertices = originalMesh.vertices;
         originalVertices = new Vector3[localOriginalVertices.Length];
         Vector3 viewPosition = viewTransform.position;
@@ -103,7 +105,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
         // Forcibly recalculate normals with the method we will use.
         // Blender exports them slightly differently, and I cannot figure out the difference.
-        RecalculateNormals(originalMesh, originalObject.useSmoothShading);
+        RecalculateNormals(originalMesh, useSmoothShading);
         originalNormals = originalMesh.normals;
 
         // Update status
@@ -135,7 +137,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         deformedMesh = new();
         deformedMesh.SetVertices(deformedVertices);
         deformedMesh.SetTriangles(originalMesh.triangles, 0);
-        RecalculateNormals(deformedMesh, originalObject.useSmoothShading);
+        RecalculateNormals(deformedMesh, useSmoothShading);
         GetComponent<MeshFilter>().sharedMesh = deformedMesh;
         deformedNormals = deformedMesh.normals;
 
@@ -187,9 +189,9 @@ public class VertexNormalOptimizer : MonoBehaviour {
         }
         List<KeyValuePair<int, float>> sortedOptimizedAngularDeviations = optimizedAngularDeviationsMap.ToList();
         sortedOptimizedAngularDeviations.Sort(SortFunctions.largeToSmallValueSorter);
-        foreach ((int v, float deviation) in sortedOptimizedAngularDeviations) {
-            Debug.Log(v + ": " + deviation);
-        }
+        // foreach ((int v, float deviation) in sortedOptimizedAngularDeviations) {
+        //     Debug.Log(v + ": " + deviation);
+        // }
 
         // For a number of iterations, optimize the vertex that has the largest angular deviation
         int skipAmount = 0;
@@ -223,7 +225,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
                 // Recalculate the normals for this offset
                 optimizedMesh.SetVertices(newVertices);
-                RecalculateNormals(optimizedMesh, originalObject.useSmoothShading);
+                RecalculateNormals(optimizedMesh, useSmoothShading);
                 // Calculate the new total deviation and store it
                 float[] deviations = CalculateAngularDeviation(originalNormals, optimizedMesh.normals);
                 offsetTotalDeviationMap[offset] = Enumerable.Sum(deviations);
@@ -248,7 +250,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 }
             }
             optimizedMesh.SetVertices(optimizedVertices);
-            RecalculateNormals(optimizedMesh, originalObject.useSmoothShading);
+            RecalculateNormals(optimizedMesh, useSmoothShading);
             if (skip) {
                 skipAmount++;
                 continue;
@@ -268,6 +270,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
             // }
 
         }
+        Debug.Log("Angular deviation: " + Enumerable.Sum(optimizedAngularDeviations));
 
         // Update status
         Status = OptimizerStatus.Optimized;
