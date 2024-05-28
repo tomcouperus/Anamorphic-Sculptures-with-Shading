@@ -20,8 +20,6 @@ public class VertexNormalOptimizer : MonoBehaviour {
     [SerializeField]
     private int iterations = 1;
     public bool ManualOptimizeSteps = false;
-    private Func<int, int> doOptimizerStep;
-    [SerializeField]
     private int currentIteration = 0;
     private const int MAX_ITERATIONS = 100;
     [SerializeField]
@@ -54,6 +52,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private float[] optimizedAdjustmentDistances;
     private float[] optimizedAngularDeviations;
     private Dictionary<float, float> offsetTotalDeviationMap;
+    private Func<int, int> doOptimizerStep;
     private readonly Color GIZMOS_OPTIMIZED_COLOR = Color.magenta;
 
 
@@ -80,6 +79,9 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private bool showOptimizedVertices = false;
     [SerializeField]
     private bool showOptimizedNormals = false;
+    [SerializeField]
+    private bool showOffsetDeviationMap = false;
+
 
     public enum OptimizerStatus { None, Initialized, Deformed, Optimized };
     public OptimizerStatus Status { get; private set; } = OptimizerStatus.None;
@@ -489,6 +491,11 @@ public class VertexNormalOptimizer : MonoBehaviour {
         if (showOptimizedNormals) {
             for (int i = 0; i < optimizedNormals.Length; i++) {
                 Gizmos.DrawLine(optimizedVertices[i], optimizedVertices[i] + optimizedNormals[i]);
+            }
+        }
+        if (showOffsetDeviationMap) {
+            foreach ((float offset, float deviation) in offsetTotalDeviationMap) {
+                Gizmos.DrawSphere(new Vector3(offset, deviation / 20, 10), GIZMO_SPHERE_RADIUS * 3);
             }
         }
     }
