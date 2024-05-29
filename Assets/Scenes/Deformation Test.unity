@@ -169,15 +169,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 44cab05a52a04471a9c3b9912b9a61c3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  originalObject: {fileID: 1542337061}
+  originalObject: {fileID: 540847974}
   useSmoothShading: 1
   viewTransform: {fileID: 1104672223}
   seed: 0
-  iterations: 100
-  ManualOptimizeSteps: 1
-  minOptimizeOffset: -5
-  maxOptimizeOffset: 5
+  iterations: 1000
+  ManualOptimizeSteps: 0
+  minOptimizeOffset: -10
+  maxOptimizeOffset: 10
   optimizeOffsetStep: 0.1
+  writeToFile: 1
   selectedVertex: 6
   showOriginalVertices: 1
   showOriginalNormals: 1
@@ -332,6 +333,11 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
+--- !u!33 &540847974 stripped
+MeshFilter:
+  m_CorrespondingSourceObject: {fileID: 7943650345010251659, guid: df51b20c95b9e4eed901723e7997e0c4, type: 3}
+  m_PrefabInstance: {fileID: 2786691711794485143}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1104672220
 GameObject:
   m_ObjectHideFlags: 0
@@ -580,11 +586,6 @@ Mesh:
     offset: 0
     size: 0
     path: 
---- !u!33 &1542337061 stripped
-MeshFilter:
-  m_CorrespondingSourceObject: {fileID: 4333653270791793990, guid: 6e5bc1885cd934cef9542002803d87a8, type: 3}
-  m_PrefabInstance: {fileID: 1565826722}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &1565826722
 PrefabInstance:
   m_ObjectHideFlags: 0

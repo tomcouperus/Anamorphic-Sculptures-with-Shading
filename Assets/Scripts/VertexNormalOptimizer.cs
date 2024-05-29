@@ -29,6 +29,11 @@ public class VertexNormalOptimizer : MonoBehaviour {
     [SerializeField]
     private float optimizeOffsetStep = 0.1f;
 
+    [Header("Save settings")]
+    [SerializeField]
+    private bool writeToFile;
+    private VertexNormalOptimizerData saveData;
+
     [Header("Status: Initialized -- variables")]
     private Mesh originalMesh;
     private Vector3[] originalVertices;
@@ -165,24 +170,32 @@ public class VertexNormalOptimizer : MonoBehaviour {
             // On the last iteration, print the nice message
             if (currentIteration == iterations - 1) {
                 Debug.Log("Angular deviation: " + Enumerable.Sum(optimizedAngularDeviations));
+                if (saveData != null) saveData.Save();
             }
             currentIteration++;
             return;
         }
         // Otherwise, if not manually stepping, execute all steps.
         // If manual stepping, do all initialization, and do 1 step.
-
         Debug.Log("Optimizing vertex normals");
 
         // Make a list of various offsets
         offsetTotalDeviationMap = new();
-        float minOffset = -5;
-        float maxOffset = 5;
-        float offsetStep = 0.1f;
         List<float> offsets = new();
-        for (float offset = minOffset; offset <= maxOffset; offset += offsetStep) {
+        for (float offset = minOptimizeOffset; offset <= maxOptimizeOffset; offset += optimizeOffsetStep) {
             offsets.Add(offset);
             offsetTotalDeviationMap.Add(offset, -1);
+        }
+
+        // If having the saving enabled, make the save data
+        saveData = null;
+        if (writeToFile) {
+            saveData = new(originalObject.gameObject.name, seed, Enumerable.Sum(deformedAngularDeviations), "Random");
+            saveData.Offsets.AddRange(offsets);
+            saveData.IdealNormalAnglesFromRay = new float[originalNormals.Length];
+            for (int i = 0; i < originalNormals.Length; i++) {
+                saveData.IdealNormalAnglesFromRay[i] = Vector3.Angle(adjustmentRays[i], originalNormals[i]);
+            }
         }
 
         // Optimize the deformed mesh by adjusting the distance along the rays
@@ -260,6 +273,20 @@ public class VertexNormalOptimizer : MonoBehaviour {
             // Apply this optimal offset to all identical vertices
             float optimalDistance = optimizedAdjustmentDistances[v] + sortedOffsetTotalDeviations[0].Key;
             Vector3 optimalVertexPosition = viewPosition + adjustmentRays[v] * optimalDistance;
+
+            // Save the calculation of this iteration, if we're actually saving
+            if (saveData != null) {
+                List<KeyValuePair<float, float>> deviationsSortedByOffset = offsetTotalDeviationMap.ToList();
+                deviationsSortedByOffset.Sort(SortFunctions.smallToLargeKeySorter);
+                List<float> sortedDeviations = new();
+                foreach ((float _, float deviation) in deviationsSortedByOffset) {
+                    sortedDeviations.Add(deviation);
+                }
+                saveData.Deviations.AddRange(sortedDeviations);
+                saveData.Vertices.Add(v);
+            }
+
+            // Check if the vertex changes or not, and skip move the next iteration forward if it doesn't.
             bool skip = false;
             if (optimalVertexPosition == optimizedVertices[v]) {
                 Debug.Log("Optimal position already attained");
@@ -275,10 +302,13 @@ public class VertexNormalOptimizer : MonoBehaviour {
             RecalculateNormals(optimizedMesh, useSmoothShading);
             if (skip) {
                 skipAmount++;
+                if (saveData != null) saveData.SkippedIterations.Add(true);
                 return 1;
             } else {
                 skipAmount = 0;
+                if (saveData != null) saveData.SkippedIterations.Add(false);
             }
+            // If not skipped, finish the iteration
             optimizedNormals = optimizedMesh.normals;
             // Resort the vertices according to their new deviations
             optimizedAngularDeviations = CalculateAngularDeviation(originalNormals, optimizedNormals);
@@ -287,9 +317,6 @@ public class VertexNormalOptimizer : MonoBehaviour {
             }
             sortedOptimizedAngularDeviations = optimizedAngularDeviationsMap.ToList();
             sortedOptimizedAngularDeviations.Sort(SortFunctions.largeToSmallValueSorter);
-            // foreach ((int vi, float deviation) in sortedOptimizedAngularDeviations) {
-            //     Debug.Log(vi + ": " + deviation);
-            // }
             return 0;
         };
 
@@ -302,6 +329,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 if (result == 2) break;
             }
             Debug.Log("Angular deviation: " + Enumerable.Sum(optimizedAngularDeviations));
+            if (saveData != null) saveData.Save();
         }
         // Update status
         Status = OptimizerStatus.Optimized;
@@ -310,6 +338,9 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
     public void Reset() {
         Debug.Log("Resetting");
+        // Save settings
+        saveData = null;
+
         // Status: Initialized -- variables
         originalMesh = null;
         originalVertices = null;
@@ -515,4 +546,35 @@ public class VertexNormalOptimizer : MonoBehaviour {
         if (minOptimizeOffset >= maxOptimizeOffset) minOptimizeOffset = maxOptimizeOffset - optimizeOffsetStep;
     }
 #endif
+
+    // Save data class
+    [Serializable]
+    private class VertexNormalOptimizerData {
+        public string ObjectName;
+        public int Seed;
+        public float DeformedAngularDeviation;
+        public string DeformationMethod;
+        public List<float> Offsets;
+        public List<float> Deviations;
+        public List<int> Vertices;
+        public List<bool> SkippedIterations;
+        public float[] IdealNormalAnglesFromRay;
+
+        public VertexNormalOptimizerData(string name, int seed, float deformedAngularDeviation, string deformationMethod) {
+            ObjectName = name;
+            Seed = seed;
+            DeformedAngularDeviation = deformedAngularDeviation;
+            DeformationMethod = deformationMethod;
+            Offsets = new();
+            Deviations = new();
+            Vertices = new();
+            SkippedIterations = new();
+        }
+
+        public void Save() {
+            string jsonString = JsonUtility.ToJson(this);
+            string path = "./" + ObjectName + ".json";
+            System.IO.File.WriteAllText(path, jsonString);
+        }
+    }
 }
