@@ -170,8 +170,8 @@ public class VertexNormalOptimizer : MonoBehaviour {
             // On the last iteration, print the nice message
             if (currentIteration == iterations - 1) {
                 Debug.Log("Angular deviation: " + Enumerable.Sum(optimizedAngularDeviations));
-                if (saveData != null) saveData.Save();
             }
+            if (saveData != null) saveData.Save();
             currentIteration++;
             return;
         }
