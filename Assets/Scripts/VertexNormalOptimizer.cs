@@ -190,7 +190,14 @@ public class VertexNormalOptimizer : MonoBehaviour {
         // If having the saving enabled, make the save data
         saveData = null;
         if (writeToFile) {
-            saveData = new(originalObject.gameObject.name, seed, Enumerable.Sum(deformedAngularDeviations), "Random");
+            saveData = new() {
+                ObjectName = originalObject.gameObject.name,
+                Seed = seed,
+                VertexCount = originalVertices.Length,
+                DeformedAngularDeviation = Enumerable.Sum(deformedAngularDeviations),
+                DeformationMethod = "Random",
+                VertexSelectionMethod = "Maximum local angular deviation, skipping if no decrease in total deviation"
+            };
             saveData.Offsets.AddRange(offsets);
             saveData.IdealNormalAnglesFromRay = new float[originalNormals.Length];
             for (int i = 0; i < originalNormals.Length; i++) {
@@ -552,19 +559,17 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private class VertexNormalOptimizerData {
         public string ObjectName;
         public int Seed;
+        public int VertexCount;
         public float DeformedAngularDeviation;
         public string DeformationMethod;
+        public string VertexSelectionMethod;
         public List<float> Offsets;
         public List<float> Deviations;
         public List<int> Vertices;
         public List<bool> SkippedIterations;
         public float[] IdealNormalAnglesFromRay;
 
-        public VertexNormalOptimizerData(string name, int seed, float deformedAngularDeviation, string deformationMethod) {
-            ObjectName = name;
-            Seed = seed;
-            DeformedAngularDeviation = deformedAngularDeviation;
-            DeformationMethod = deformationMethod;
+        public VertexNormalOptimizerData() {
             Offsets = new();
             Deviations = new();
             Vertices = new();
