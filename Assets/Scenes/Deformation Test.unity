@@ -179,9 +179,9 @@ MonoBehaviour:
   seed: 0
   iterations: 1000
   ManualOptimizeSteps: 0
-  minOptimizeOffset: -10
-  maxOptimizeOffset: 10
-  optimizeOffsetStep: 0.1
+  minOptimizeOffset: -1
+  maxOptimizeOffset: 1
+  optimizeOffsetStep: 0.01
   writeToFile: 1
   selectedVertex: 6
   showOriginalVertices: 1
