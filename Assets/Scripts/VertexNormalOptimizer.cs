@@ -246,7 +246,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 return 2;
             }
             int v = sortedOptimizedAngularDeviations[skipAmount].Key;
-            Debug.Log("Iteration: " + i + ", vertex: " + v);
+            // Debug.Log("Iteration: " + i + ", vertex: " + v);
             Vector3[] newVertices = (Vector3[]) optimizedVertices.Clone();
 
             // Find the set of identical vertices containing v
@@ -281,8 +281,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
             sortedOffsetTotalDeviations.Sort(SortFunctions.smallToLargeValueSorter);
 
             // Apply this optimal offset to all identical vertices
-            float optimalDistance = optimizedAdjustmentDistances[v] + sortedOffsetTotalDeviations[0].Key;
-            Vector3 optimalVertexPosition = viewPosition + adjustmentRays[v] * optimalDistance;
+            float optimalOffset = sortedOffsetTotalDeviations[0].Key;
 
             // Save the calculation of this iteration, if we're actually saving
             if (saveData != null) {
@@ -298,11 +297,14 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
             // Check if the vertex changes or not, and skip move the next iteration forward if it doesn't.
             bool skip = false;
-            if (optimalVertexPosition == optimizedVertices[v]) {
+            float effectivelyZeroOffset = optimizeOffsetStep - 0.0001f;
+            if (optimalOffset > -effectivelyZeroOffset && optimalOffset < effectivelyZeroOffset) {
                 Debug.Log("Optimal position already attained");
                 skip = true;
             } else {
                 skip = false;
+                float optimalDistance = optimizedAdjustmentDistances[v] + optimalOffset;
+                Vector3 optimalVertexPosition = viewPosition + adjustmentRays[v] * optimalDistance;
                 foreach (int vi in identicalVertices) {
                     optimizedVertices[vi] = optimalVertexPosition;
                     optimizedAdjustmentDistances[vi] = optimalDistance;
