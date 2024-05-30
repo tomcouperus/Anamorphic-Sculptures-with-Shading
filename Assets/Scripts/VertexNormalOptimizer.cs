@@ -199,7 +199,8 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 VertexCount = originalVertices.Length,
                 DeformedAngularDeviation = Enumerable.Sum(deformedAngularDeviations),
                 DeformationMethod = "Random",
-                VertexSelectionMethod = "Maximum local angular deviation, skipping if no decrease in total deviation"
+                VertexSelectionMethod = "Maximum local angular deviation, skipping if no decrease in total deviation",
+                SamplingRate = optimizeOffsetStep
             };
             saveData.Offsets.AddRange(offsets);
             saveData.IdealNormalAnglesFromRay = new float[originalNormals.Length];
@@ -283,8 +284,9 @@ public class VertexNormalOptimizer : MonoBehaviour {
             // Apply this optimal offset to all identical vertices
             float optimalOffset = sortedOffsetTotalDeviations[0].Key;
 
-            // Save the calculation of this iteration, if we're actually saving
+            // If we're actually saving
             if (saveData != null) {
+                // Save the deviations of this iteration sorted by offset
                 List<KeyValuePair<float, float>> deviationsSortedByOffset = offsetTotalDeviationMap.ToList();
                 deviationsSortedByOffset.Sort(SortFunctions.smallToLargeKeySorter);
                 List<float> sortedDeviations = new();
@@ -292,14 +294,17 @@ public class VertexNormalOptimizer : MonoBehaviour {
                     sortedDeviations.Add(deviation);
                 }
                 saveData.Deviations.AddRange(sortedDeviations);
+                // Save the current vertex
                 saveData.Vertices.Add(v);
+                // Save this iteration's initial total deviation that is has to decrease
+                saveData.CurrentDeviations.Add(Enumerable.Sum(optimizedAngularDeviations));
             }
 
             // Check if the vertex changes or not, and skip move the next iteration forward if it doesn't.
             bool skip = false;
             float effectivelyZeroOffset = optimizeOffsetStep - 0.0001f;
             if (optimalOffset > -effectivelyZeroOffset && optimalOffset < effectivelyZeroOffset) {
-                Debug.Log("Optimal position already attained");
+                // Debug.Log("Optimal position already attained");
                 skip = true;
             } else {
                 skip = false;
@@ -582,8 +587,10 @@ public class VertexNormalOptimizer : MonoBehaviour {
         public float DeformedAngularDeviation;
         public string DeformationMethod;
         public string VertexSelectionMethod;
+        public float SamplingRate;
         public List<float> Offsets;
         public List<float> Deviations;
+        public List<float> CurrentDeviations;
         public List<int> Vertices;
         public List<bool> SkippedIterations;
         public float[] IdealNormalAnglesFromRay;
@@ -591,6 +598,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         public VertexNormalOptimizerData() {
             Offsets = new();
             Deviations = new();
+            CurrentDeviations = new();
             Vertices = new();
             SkippedIterations = new();
         }
