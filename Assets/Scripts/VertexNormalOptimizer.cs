@@ -381,11 +381,21 @@ public class VertexNormalOptimizer : MonoBehaviour {
     }
 
     public void SwitchMesh() {
-        bool noneOrInit = Status == OptimizerStatus.None || Status == OptimizerStatus.Initialized;
-        GetComponent<MeshRenderer>().enabled = !noneOrInit;
         MeshFilter meshFilter = GetComponent<MeshFilter>();
-        if (Status == OptimizerStatus.Deformed) meshFilter.sharedMesh = deformedMesh;
-        else if (Status == OptimizerStatus.Optimized) meshFilter.sharedMesh = optimizedMesh;
+        switch (Status) {
+            case OptimizerStatus.None:
+                meshFilter.sharedMesh = null;
+                break;
+            case OptimizerStatus.Initialized:
+                meshFilter.sharedMesh = originalMesh;
+                break;
+            case OptimizerStatus.Deformed:
+                meshFilter.sharedMesh = deformedMesh;
+                break;
+            case OptimizerStatus.Optimized:
+                meshFilter.sharedMesh = optimizedMesh;
+                break;
+        }
     }
 
     // HELPER METHODS
