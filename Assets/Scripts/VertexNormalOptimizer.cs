@@ -8,7 +8,9 @@ using UnityEngine;
 public class VertexNormalOptimizer : MonoBehaviour {
     [Header("General Settings")]
     [SerializeField]
-    private MeshFilter originalObject;
+    private MeshFilter[] originalObjects;
+    [SerializeField]
+    private int originalObjectIndex;
     [SerializeField]
     private bool useSmoothShading;
     [SerializeField]
@@ -98,6 +100,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         UnityEngine.Random.InitState(seed);
 
         // Translate the original points to global space and obtain the adjustment rays
+        MeshFilter originalObject = originalObjects[originalObjectIndex];
         originalMesh = originalObject.sharedMesh;
         Vector3[] localOriginalVertices = originalMesh.vertices;
         originalVertices = new Vector3[localOriginalVertices.Length];
@@ -191,7 +194,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         saveData = null;
         if (writeToFile) {
             saveData = new() {
-                ObjectName = originalObject.gameObject.name,
+                ObjectName = originalObjects[originalObjectIndex].gameObject.name,
                 Seed = seed,
                 VertexCount = originalVertices.Length,
                 DeformedAngularDeviation = Enumerable.Sum(deformedAngularDeviations),
@@ -379,7 +382,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
     public void SwitchMesh() {
         bool noneOrInit = Status == OptimizerStatus.None || Status == OptimizerStatus.Initialized;
-        originalObject.gameObject.SetActive(noneOrInit);
+        originalObjects[originalObjectIndex].gameObject.SetActive(noneOrInit);
         GetComponent<MeshRenderer>().enabled = !noneOrInit;
         MeshFilter meshFilter = GetComponent<MeshFilter>();
         if (Status == OptimizerStatus.Deformed) meshFilter.sharedMesh = deformedMesh;
@@ -546,6 +549,11 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
     // INPUT CHECKER
     private void OnValidate() {
+        if (originalObjectIndex < 0) originalObjectIndex = 0;
+        if (originalObjectIndex >= originalObjects.Length) originalObjectIndex = originalObjects.Length - 1;
+        for (int i = 0; i < originalObjects.Length; i++) {
+            originalObjects[i].gameObject.SetActive(i == originalObjectIndex);
+        }
         if (iterations < 1) iterations = 1;
         if (iterations > MAX_ITERATIONS) iterations = MAX_ITERATIONS;
         if (originalMesh != null && selectedVertex >= originalMesh.vertexCount) selectedVertex = originalMesh.vertexCount - 1;
