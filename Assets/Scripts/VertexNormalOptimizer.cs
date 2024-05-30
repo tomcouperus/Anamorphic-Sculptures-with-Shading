@@ -382,7 +382,6 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
     public void SwitchMesh() {
         bool noneOrInit = Status == OptimizerStatus.None || Status == OptimizerStatus.Initialized;
-        originalObjects[originalObjectIndex].gameObject.SetActive(noneOrInit);
         GetComponent<MeshRenderer>().enabled = !noneOrInit;
         MeshFilter meshFilter = GetComponent<MeshFilter>();
         if (Status == OptimizerStatus.Deformed) meshFilter.sharedMesh = deformedMesh;
