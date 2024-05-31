@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.VisualScripting;
+using UnityEditor;
 using UnityEngine;
 
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
@@ -14,7 +15,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     [SerializeField]
     private bool useSmoothShading;
     [SerializeField]
-    private Transform viewTransform;
+    private Observer observer;
     [SerializeField]
     private int seed = 0;
 
@@ -30,6 +31,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private float maxOptimizeOffset = 5;
     [SerializeField]
     private float optimizeOffsetStep = 0.1f;
+    private const float MINIMUM_OPTIMIZE_OFFSET_STEP = 0.0001f;
 
     [Header("Save settings")]
     [SerializeField]
@@ -104,7 +106,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         originalMesh = originalObject.sharedMesh;
         Vector3[] localOriginalVertices = originalMesh.vertices;
         originalVertices = new Vector3[localOriginalVertices.Length];
-        Vector3 viewPosition = viewTransform.position;
+        Vector3 viewPosition = observer.transform.position;
         adjustmentRays = new Vector3[originalVertices.Length];
         originalAdjustmentDistances = new float[originalVertices.Length];
         for (int i = 0; i < localOriginalVertices.Length; i++) {
@@ -130,7 +132,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         // Apply a deformation to the original mesh by adjusting the distance along the rays
         deformedVertices = new Vector3[adjustmentRays.Length];
         deformedAdjustmentDistances = new float[adjustmentRays.Length];
-        Vector3 viewPosition = viewTransform.position;
+        Vector3 viewPosition = observer.transform.position;
         // But only deform the unique vertices
         Dictionary<Vector3, List<int>> verticesByPosition = GroupVerticesByLocation(originalVertices);
         foreach ((Vector3 position, List<int> identicalVertices) in verticesByPosition) {
@@ -193,7 +195,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         // If having the saving enabled, make the save data
         saveData = null;
         if (writeToFile) {
-            saveData = new() {
+            saveData = new(FileName()) {
                 ObjectName = originalObjects[originalObjectIndex].gameObject.name,
                 Seed = seed,
                 VertexCount = originalVertices.Length,
@@ -216,7 +218,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         optimizedAdjustmentDistances = (float[]) deformedAdjustmentDistances.Clone();
         optimizedAngularDeviations = (float[]) deformedAngularDeviations.Clone();
 
-        Vector3 viewPosition = viewTransform.position;
+        Vector3 viewPosition = observer.transform.position;
 
         // Initialize mesh
         optimizedMesh = new();
@@ -484,6 +486,12 @@ public class VertexNormalOptimizer : MonoBehaviour {
         return angularDeviations;
     }
 
+    private string FileName() {
+        string filename = originalObjects[originalObjectIndex].name;
+        filename += "_(" + minOptimizeOffset.ToString("0.00") + "_" + optimizeOffsetStep.ToString("0.0000") + "_" + maxOptimizeOffset.ToString("0.00") + ")";
+        return filename;
+    }
+
     // DEBUG METHODS
 #if UNITY_EDITOR
     private void DrawInitializedGizmos() {
@@ -507,7 +515,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         }
         if (showAdjustmentRays) {
             for (int i = 0; i < adjustmentRays.Length; i++) {
-                Gizmos.DrawLine(viewTransform.position, viewTransform.position + (adjustmentRaysScale * adjustmentRays[i]));
+                Gizmos.DrawLine(observer.transform.position, observer.transform.position + (adjustmentRaysScale * adjustmentRays[i]));
             }
         }
     }
@@ -565,16 +573,22 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
     // INPUT CHECKER
     private void OnValidate() {
+        // Object selection
         if (originalObjectIndex < 0) originalObjectIndex = 0;
         if (originalObjectIndex >= originalObjects.Length) originalObjectIndex = originalObjects.Length - 1;
         for (int i = 0; i < originalObjects.Length; i++) {
             originalObjects[i].gameObject.SetActive(i == originalObjectIndex);
         }
+        // Iteration selection
         if (iterations < 1) iterations = 1;
         if (iterations > MAX_ITERATIONS) iterations = MAX_ITERATIONS;
+        // Vertex selection
         if (originalMesh != null && selectedVertex >= originalMesh.vertexCount) selectedVertex = originalMesh.vertexCount - 1;
         if (selectedVertex < 0) selectedVertex = 0;
+        // Optimization offset range selection
         if (minOptimizeOffset >= maxOptimizeOffset) minOptimizeOffset = maxOptimizeOffset - optimizeOffsetStep;
+        // Optimization offset step selection
+        if (optimizeOffsetStep < MINIMUM_OPTIMIZE_OFFSET_STEP) optimizeOffsetStep = MINIMUM_OPTIMIZE_OFFSET_STEP;
     }
 #endif
 
@@ -595,17 +609,20 @@ public class VertexNormalOptimizer : MonoBehaviour {
         public List<bool> SkippedIterations;
         public float[] IdealNormalAnglesFromRay;
 
-        public VertexNormalOptimizerData() {
+        private readonly string fileName;
+
+        public VertexNormalOptimizerData(string filename) {
             Offsets = new();
             Deviations = new();
             CurrentDeviations = new();
             Vertices = new();
             SkippedIterations = new();
+            fileName = filename;
         }
 
         public void Save() {
             string jsonString = JsonUtility.ToJson(this);
-            string path = "./" + ObjectName + ".json";
+            string path = "./" + fileName + ".json";
             System.IO.File.WriteAllText(path, jsonString);
         }
     }
