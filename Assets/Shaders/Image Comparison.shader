@@ -17,6 +17,7 @@ Shader "Custom/Image Comparison Shader"
             #pragma fragment frag
 
             #include "UnityCG.cginc"
+            #include "LabColorspace.cginc"
 
             struct appdata
             {
