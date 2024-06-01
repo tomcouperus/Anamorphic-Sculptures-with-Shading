@@ -63,4 +63,38 @@ float3 lab2rgb( float3 c ) {
     return xyz2rgb( lab2xyz( float3(100.0 * c.x, 2.0 * 127.0 * (c.y - 0.5), 2.0 * 127.0 * (c.z - 0.5)) ) );
 }
 
+// Personal additions
+#define JND 1.0
+
+// http://www.brucelindbloom.com/index.html?Eqn_DeltaE_CIE94.html
+float deltaE94(float3 lab1, float3 lab2) {
+    // Since we're doing graphic arts, use the following constants
+    float kl = 1;
+    float K1 = 0.045;
+    float K2 = 0.015;
+
+    // Preliminary variables
+    float deltaL = lab1.x - lab2.x;
+    float C1 = sqrt(lab1.y*lab1.y + lab1.z*lab1.z);
+    float C2 = sqrt(lab2.y*lab2.y + lab2.z*lab2.z);
+    float deltaC = C1 - C2;
+    float deltaA = lab1.y - lab2.y;
+    float deltaB = lab1.z - lab2.z;
+    float deltaH = sqrt(deltaA*deltaA + deltaB*deltaB - deltaC*deltaC);
+    float sl = 1;
+    float sc = 1 + K1*C1;
+    float sh = 1 + K2*C1;
+    float kc = 1;
+    float kh = 1;
+
+    // Main formula parts
+    float term1 = deltaL / (kl*sl);
+    float term2 = deltaC / (kc*sc);
+    float term3 = deltaH / (kh*sh);
+
+    // Main formula
+    float deltaE = sqrt( term1*term1 + term2*term2 + term3*term3 );
+    return deltaE;
+}
+
 #endif

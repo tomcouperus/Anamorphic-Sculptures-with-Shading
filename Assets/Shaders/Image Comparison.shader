@@ -49,9 +49,14 @@ Shader "Custom/Image Comparison Shader"
             fixed4 frag (v2f i) : SV_Target
             {
                 // sample the texture
-                fixed4 colOriginal = tex2D(_OriginalObjTex, i.uvOriginal);
-                fixed4 colMapped = tex2D(_MappedObjTex, i.uvMapped);
-                return abs(colOriginal - colMapped);
+                float3 colOriginal = rgb2lab(tex2D(_OriginalObjTex, i.uvOriginal).rgb);
+                float3 colMapped = rgb2lab(tex2D(_MappedObjTex, i.uvMapped).rgb);
+                fixed4 col = fixed4(0, 0, 0, 0);
+                float deltaE = deltaE94(colOriginal, colMapped);
+                col.r = deltaE;
+                col.g = deltaE;
+                col.b = deltaE;
+                return col;
             }
             ENDCG
         }
