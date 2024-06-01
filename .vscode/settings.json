@@ -49,7 +49,9 @@
         "Obj/": true,
         "ProjectSettings/": true,
         "temp/": true,
-        "Temp/": true
+        "Temp/": true,
+        "**/NuGet/": true,
+        "Assets/Packages": true
     },
     "dotnet.preferCSharpExtension": true,
     "dotnet.defaultSolution": "Anamorphic Sculptures with Shading.sln",
