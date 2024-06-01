@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.VisualScripting;
-using UnityEditor;
 using UnityEngine;
 
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
@@ -31,7 +30,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private float maxOptimizeOffset = 5;
     [SerializeField]
     private float optimizeOffsetStep = 0.1f;
-    private const float MINIMUM_OPTIMIZE_OFFSET_STEP = 0.0001f;
+    private const float MINIMUM_OPTIMIZE_OFFSET_STEP = 0.001f;
 
     [Header("Save settings")]
     [SerializeField]
