@@ -6,6 +6,10 @@ using UnityEngine;
 
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class VertexNormalOptimizer : MonoBehaviour {
+    private const string NORMAL_SHADER_FLIP_PROP_NAME = "_FlipNormalsZ";
+
+    private enum DeformationMethod { Random, Mirror };
+
     [Header("General Settings")]
     [SerializeField]
     private MeshFilter[] originalObjects;
@@ -17,6 +21,18 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private Observer observer;
     [SerializeField]
     private int seed = 0;
+    [SerializeField]
+    private Material defaultMaterial;
+    [SerializeField]
+    private Material normalDiffMaterial;
+
+    [Header("Deformation Settings")]
+    [SerializeField]
+    private DeformationMethod deformationMethod = DeformationMethod.Random;
+    [SerializeField]
+    private Mirror mirror;
+    [SerializeField]
+    private float maxRaycastDistance = 20;
 
     [Header("Optimizer Settings")]
     [SerializeField]
@@ -41,6 +57,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private Mesh originalMesh;
     private Vector3[] originalVertices;
     private Vector3[] originalNormals;
+    private Vector3[] adjustmentRayOrigins;
     private Vector3[] adjustmentRays;
     private float[] originalAdjustmentDistances;
     private readonly Color GIZMOS_INITIALIZED_COLOR = Color.white;
@@ -66,6 +83,8 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
     private const float GIZMO_SPHERE_RADIUS = 0.05f;
     [Header("Debug")]
+    [SerializeField]
+    private bool useNormalDiffShader = false;
     [SerializeField]
     private int selectedVertex = 0;
     private readonly Color GIZMOS_SELECTED_COLOR = Color.green;
@@ -102,35 +121,101 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
         // Translate the original points to global space and obtain the adjustment rays
         MeshFilter originalObject = originalObjects[originalObjectIndex];
-        originalMesh = originalObject.sharedMesh;
+        originalMesh = originalObject.mesh;
         Vector3[] localOriginalVertices = originalMesh.vertices;
         originalVertices = new Vector3[localOriginalVertices.Length];
         Vector3 viewPosition = observer.transform.position;
+        adjustmentRayOrigins = new Vector3[originalVertices.Length];
         adjustmentRays = new Vector3[originalVertices.Length];
         originalAdjustmentDistances = new float[originalVertices.Length];
         for (int i = 0; i < localOriginalVertices.Length; i++) {
             originalVertices[i] = originalObject.transform.TransformPoint(localOriginalVertices[i]);
             Vector3 ray = originalVertices[i] - viewPosition;
+            adjustmentRayOrigins[i] = observer.transform.position;
             adjustmentRays[i] = ray.normalized;
             originalAdjustmentDistances[i] = ray.magnitude;
         }
 
-        // Forcibly recalculate normals with the method we will use.
-        // Blender exports them slightly differently, and I cannot figure out the difference.
+        // Recalculate normals to use smooth shading or not
         RecalculateNormals(originalMesh, useSmoothShading);
         originalNormals = originalMesh.normals;
+        originalMesh.SetUVs(3, originalNormals);
 
         // Update status
         Status = OptimizerStatus.Initialized;
         SwitchMesh();
     }
+
     public void Deform() {
         // if (Status != OptimizerStatus.Initialized) return;
         Debug.Log("Deforming mesh");
-
-        // Apply a deformation to the original mesh by adjusting the distance along the rays
         deformedVertices = new Vector3[adjustmentRays.Length];
-        deformedAdjustmentDistances = new float[adjustmentRays.Length];
+        deformedAdjustmentDistances = new float[originalVertices.Length];
+
+        switch (deformationMethod) {
+            case DeformationMethod.Random:
+                DeformRandom();
+                break;
+            case DeformationMethod.Mirror:
+                DeformMirror();
+                break;
+        }
+
+        // Calculate deviation
+        deformedAngularDeviations = CalculateAngularDeviation(originalNormals, deformedNormals, deformationMethod == DeformationMethod.Mirror);
+        Debug.Log("Angular deviation: " + Enumerable.Sum(deformedAngularDeviations));
+
+        // Update status
+        currentIteration = 0;
+        Status = OptimizerStatus.Deformed;
+        SwitchMesh();
+    }
+
+    private void DeformMirror() {
+        // Deform the mesh through a mirror
+        // First calculate the intersection points with a mirror to obtain reflection rays as the relevant adjustment rays
+        Vector3 viewPosition = observer.transform.position;
+        for (int i = 0; i < originalVertices.Length; i++) {
+            // Raycast from observer to each vertex on the original object to find intersection with mirror.
+            Vector3 direction = (originalVertices[i] - viewPosition).normalized;
+            RaycastHit[] hits = Physics.RaycastAll(viewPosition, direction, maxRaycastDistance, LayerMask.GetMask("Mirror"));
+
+            // Use hit as origin
+            if (hits.Length == 0) {
+                Debug.LogError("At least one ray from the observer to the original object does not hit the mirror.");
+                return;
+            }
+            // Set these as the new adjustment rays
+            adjustmentRayOrigins[i] = hits[0].point;
+            adjustmentRays[i] = Vector3.Reflect(direction, hits[0].normal);
+            // adjustmentRays[i].z *= -1;
+
+            // Determine the distance from each vertex to their respective mirror intersection
+            // And place the deformed vertex
+            deformedAdjustmentDistances[i] = Vector3.Distance(originalVertices[i], adjustmentRayOrigins[i]);
+            deformedVertices[i] = adjustmentRayOrigins[i] + adjustmentRays[i] * deformedAdjustmentDistances[i];
+        }
+
+        // Apply it to a new mesh
+        deformedMesh = new();
+        deformedMesh.SetVertices(deformedVertices);
+        int[] deformedTriangles = new int[originalMesh.triangles.Length];
+        for (int i = 0; i < deformedTriangles.Length; i += 3) {
+            deformedTriangles[i] = originalMesh.triangles[i + 2];
+            deformedTriangles[i + 1] = originalMesh.triangles[i + 1];
+            deformedTriangles[i + 2] = originalMesh.triangles[i];
+        }
+        deformedMesh.SetTriangles(deformedTriangles, 0);
+        // deformedMesh.SetTriangles(originalMesh.triangles, 0);
+        RecalculateNormals(deformedMesh, useSmoothShading);
+        GetComponent<MeshFilter>().sharedMesh = deformedMesh;
+        deformedNormals = deformedMesh.normals;
+        // Upload the original normals to the shader as uv coordinates
+        deformedMesh.SetUVs(3, originalNormals);
+    }
+
+    private void DeformRandom() {
+        // Apply a deformation to the original mesh by adjusting the distance along the rays
         Vector3 viewPosition = observer.transform.position;
         // But only deform the unique vertices
         Dictionary<Vector3, List<int>> verticesByPosition = GroupVerticesByLocation(originalVertices);
@@ -152,27 +237,20 @@ public class VertexNormalOptimizer : MonoBehaviour {
         RecalculateNormals(deformedMesh, useSmoothShading);
         GetComponent<MeshFilter>().sharedMesh = deformedMesh;
         deformedNormals = deformedMesh.normals;
-
-        // Calculate deviation
-        deformedAngularDeviations = CalculateAngularDeviation(originalNormals, deformedNormals);
-        Debug.Log("Angular deviation: " + Enumerable.Sum(deformedAngularDeviations));
-
-        // Update status
-        currentIteration = 0;
-        Status = OptimizerStatus.Deformed;
-        SwitchMesh();
+        // Upload the original normals to the shader as uv coordinates
+        deformedMesh.SetUVs(3, originalNormals);
     }
 
     public void Optimize() {
         // if (Status != OptimizerStatus.Deformed) return;
 
         // If doing manual stepping and optimization is set up, just execute one step, until you reach the maximum specified
-        if (ManualOptimizeSteps && currentIteration > 0 && currentIteration < iterations) {
+        if (ManualOptimizeSteps && currentIteration > 0) {
             int result = doOptimizerStep(currentIteration);
             // If the optimization can't go further, pretend this was the last iteration
             if (result == 2) currentIteration = iterations - 1;
             // On the last iteration, print the nice message
-            if (currentIteration == iterations - 1) {
+            if (currentIteration >= iterations - 1) {
                 Debug.Log("Angular deviation: " + Enumerable.Sum(optimizedAngularDeviations));
             }
             if (saveData != null) saveData.Save();
@@ -222,7 +300,8 @@ public class VertexNormalOptimizer : MonoBehaviour {
         // Initialize mesh
         optimizedMesh = new();
         optimizedMesh.SetVertices(optimizedVertices);
-        optimizedMesh.SetTriangles(originalMesh.triangles, 0);
+        optimizedMesh.SetTriangles(deformedMesh.triangles, 0);
+        optimizedMesh.SetUVs(3, originalNormals);
 
         // Only optimize the unique vertices
         Dictionary<Vector3, List<int>> verticesByPosition = GroupVerticesByLocation(originalVertices);
@@ -264,7 +343,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
             foreach (float offset in offsets) {
                 // Determine the new distance and position
                 float newDistance = optimizedAdjustmentDistances[v] + offset;
-                Vector3 newVertexPosition = viewPosition + adjustmentRays[v] * newDistance;
+                Vector3 newVertexPosition = adjustmentRayOrigins[v] + adjustmentRays[v] * newDistance;
                 // Update all identical vertices
                 foreach (int vi in identicalVertices) {
                     newVertices[vi] = newVertexPosition;
@@ -274,7 +353,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 optimizedMesh.SetVertices(newVertices);
                 RecalculateNormals(optimizedMesh, useSmoothShading);
                 // Calculate the new total deviation and store it
-                float[] deviations = CalculateAngularDeviation(originalNormals, optimizedMesh.normals);
+                float[] deviations = CalculateAngularDeviation(originalNormals, optimizedMesh.normals, reflectedNormal: deformationMethod == DeformationMethod.Mirror);
                 offsetTotalDeviationMap[offset] = Enumerable.Sum(deviations);
             }
 
@@ -310,7 +389,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
             } else {
                 skip = false;
                 float optimalDistance = optimizedAdjustmentDistances[v] + optimalOffset;
-                Vector3 optimalVertexPosition = viewPosition + adjustmentRays[v] * optimalDistance;
+                Vector3 optimalVertexPosition = adjustmentRayOrigins[v] + adjustmentRays[v] * optimalDistance;
                 foreach (int vi in identicalVertices) {
                     optimizedVertices[vi] = optimalVertexPosition;
                     optimizedAdjustmentDistances[vi] = optimalDistance;
@@ -329,7 +408,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
             // If not skipped, finish the iteration
             optimizedNormals = optimizedMesh.normals;
             // Resort the vertices according to their new deviations
-            optimizedAngularDeviations = CalculateAngularDeviation(originalNormals, optimizedNormals);
+            optimizedAngularDeviations = CalculateAngularDeviation(originalNormals, optimizedNormals, reflectedNormal: deformationMethod == DeformationMethod.Mirror);
             for (int vi = 0; vi < optimizedVertices.Length; vi++) {
                 optimizedAngularDeviationsMap[vi] = optimizedAngularDeviations[vi];
             }
@@ -363,6 +442,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         originalMesh = null;
         originalVertices = null;
         originalNormals = null;
+        adjustmentRayOrigins = null;
         adjustmentRays = null;
         originalAdjustmentDistances = null;
 
@@ -474,13 +554,15 @@ public class VertexNormalOptimizer : MonoBehaviour {
         return vertexIdentityMap;
     }
 
-    private static float[] CalculateAngularDeviation(Vector3[] normals1, Vector3[] normals2) {
+    private static float[] CalculateAngularDeviation(Vector3[] normals1, Vector3[] normals2, bool reflectedNormal = false) {
         if (normals1.Length != normals2.Length) {
             throw new ArgumentException("Arrays should have same length");
         }
         float[] angularDeviations = new float[normals1.Length];
         for (int i = 0; i < angularDeviations.Length; i++) {
-            angularDeviations[i] = Vector3.Angle(normals1[i], normals2[i]);
+            Vector3 normal1 = normals1[i];
+            if (reflectedNormal) normal1.z *= -1;
+            angularDeviations[i] = Vector3.Angle(normal1, normals2[i]);
         }
         return angularDeviations;
     }
@@ -514,7 +596,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         }
         if (showAdjustmentRays) {
             for (int i = 0; i < adjustmentRays.Length; i++) {
-                Gizmos.DrawLine(observer.transform.position, observer.transform.position + (adjustmentRaysScale * adjustmentRays[i]));
+                Gizmos.DrawLine(adjustmentRayOrigins[i], adjustmentRayOrigins[i] + (adjustmentRaysScale * adjustmentRays[i]));
             }
         }
     }
@@ -588,6 +670,20 @@ public class VertexNormalOptimizer : MonoBehaviour {
         if (minOptimizeOffset >= maxOptimizeOffset) minOptimizeOffset = maxOptimizeOffset - optimizeOffsetStep;
         // Optimization offset step selection
         if (optimizeOffsetStep < MINIMUM_OPTIMIZE_OFFSET_STEP) optimizeOffsetStep = MINIMUM_OPTIMIZE_OFFSET_STEP;
+
+        // Switch material
+        if (useNormalDiffShader) {
+            GetComponent<MeshRenderer>().material = normalDiffMaterial;
+        } else {
+            GetComponent<MeshRenderer>().material = defaultMaterial;
+        }
+
+        // Change whether the normal diff shader uses flipped normals or not
+        if (deformationMethod == DeformationMethod.Mirror) {
+            normalDiffMaterial.SetInteger(NORMAL_SHADER_FLIP_PROP_NAME, 1);
+        } else {
+            normalDiffMaterial.SetInteger(NORMAL_SHADER_FLIP_PROP_NAME, 0);
+        }
     }
 #endif
 

@@ -5,6 +5,7 @@ Shader "Normals/Morphed Surface Normals"
         _Color ("Additional color to add to the shader for better contrast", Color) = (0, 0, 0, 0)
         _Mode ("Which mode to use for showing the morphed normals. 1=Normal, 2=Object relative angle. Out of range uses 1.", Integer) = 1
         _RelativePlane ("Which plane to use for angle calculation. 1=XY, 2=YZ, 3=XZ, 4=Total. Out of range uses 1.", Integer) = 1
+        _FlipNormalsZ ("Flips the z of the normals when testing reflected objects. 0=as is, 1=flipped.", Integer) = 1
     }
     SubShader
     {
@@ -25,6 +26,7 @@ Shader "Normals/Morphed Surface Normals"
             fixed4 _Color;
             uniform int _Mode;
             uniform int _RelativePlane;
+            uniform int _FlipNormalsZ;
 
             // Vertex shader input
             struct appdata
@@ -67,7 +69,7 @@ Shader "Normals/Morphed Surface Normals"
             // Reflected mode -- fragment shader
             fixed4 reflectedMode(v2f i)
             {
-                i.normal.z = -i.normal.z;
+                if (_FlipNormalsZ == 1) i.normal.z = -i.normal.z;
                 float3 normal = normalize(i.normal);
                 float3 color = (normal + 1) * 0.5;
                 return fixed4(color.rgb, 0);
@@ -76,7 +78,7 @@ Shader "Normals/Morphed Surface Normals"
             // Object relative mode -- fragment shader 
             fixed4 objectRelativeMode(v2f i)
             {
-                i.normal.z = -i.normal.z;
+                if (_FlipNormalsZ == 1) i.normal.z = -i.normal.z;
                 float angleXY = angle2(i.normal.xy, i.originalObjectNormal.xy);
                 float angleYZ = angle2(i.normal.yz, i.originalObjectNormal.yz);
                 float angleXZ = angle2(i.normal.xz, i.originalObjectNormal.xz);

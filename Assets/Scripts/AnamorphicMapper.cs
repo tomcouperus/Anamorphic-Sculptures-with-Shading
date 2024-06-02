@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using Unity.VisualScripting;
 using UnityEngine;
 
 [RequireComponent(typeof(MeshRenderer))]
@@ -55,39 +54,22 @@ public class AnamorphicMapper : MonoBehaviour {
 
     private const float GIZMO_SPHERE_RADIUS = 0.05f;
     [Header("Debug")]
-    [SerializeField]
     private Vector3[] globalMeshVertices = null;
-    [SerializeField]
     private Vector3[] meshNormals = null;
-    [SerializeField]
     private Vector3[] meshTrianglePositions = null;
-    [SerializeField]
     private Vector3[] meshTriangleNormals = null;
-    [SerializeField]
     private Vector3[] raycastDirections = null;
-    [SerializeField]
     private int[] numReflections = null;
-    [SerializeField]
     private Vector3[,] mirrorHits = null;
-    [SerializeField]
     private Vector3[,] mirrorNormals = null;
-    [SerializeField]
     private Vector3[,] reflections = null;
-    [SerializeField]
     private float[] vertexDistancesFromMirror = null;
-    [SerializeField]
     private Vector3[] mappedVertices = null;
-    [SerializeField]
     private Vector3[] mappedNormals = null;
-    [SerializeField]
     private Vector3[] mappedTrianglePositions = null;
-    [SerializeField]
     private Vector3[] mappedTriangleNormals = null;
-    [SerializeField]
     private Vector3[] optimizedVertices = null;
-    [SerializeField]
     private Vector3[] optimizedNormals = null;
-    [SerializeField]
     private bool[] occludedVertices = null;
 
     [SerializeField]
