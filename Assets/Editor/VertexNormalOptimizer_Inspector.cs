@@ -12,16 +12,16 @@ public class VertexNormalOptimizer_Inspector : Editor {
             vertexNormalOptimizer.Initialize();
         }
 
-        // if (vertexNormalOptimizer.Status == VertexNormalOptimizer.OptimizerStatus.Initialized) {
-        if (GUILayout.Button("Deform")) {
-            vertexNormalOptimizer.Deform();
+        if (vertexNormalOptimizer.Status == VertexNormalOptimizer.OptimizerStatus.Initialized) {
+            if (GUILayout.Button("Deform")) {
+                vertexNormalOptimizer.Deform();
+            }
         }
-        // }
-        // if (vertexNormalOptimizer.Status == VertexNormalOptimizer.OptimizerStatus.Deformed) {
-        if (GUILayout.Button("Optimize")) {
-            vertexNormalOptimizer.Optimize();
+        if (vertexNormalOptimizer.Status == VertexNormalOptimizer.OptimizerStatus.Deformed || vertexNormalOptimizer.Status == VertexNormalOptimizer.OptimizerStatus.OptimizingManual) {
+            if (GUILayout.Button("Optimize")) {
+                vertexNormalOptimizer.Optimize();
+            }
         }
-        // }
         if (GUILayout.Button("Reset")) {
             vertexNormalOptimizer.Reset();
         }

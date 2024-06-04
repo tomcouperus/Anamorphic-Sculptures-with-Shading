@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.VisualScripting;
@@ -39,7 +40,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private int iterations = 1;
     public bool ManualOptimizeSteps = false;
     private int currentIteration = 0;
-    private const int MAX_ITERATIONS = 1000;
+    private const int MAX_ITERATIONS = 10000;
     [SerializeField]
     private float minOptimizeOffset = -5;
     [SerializeField]
@@ -110,7 +111,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private bool showOffsetDeviationMap = false;
 
 
-    public enum OptimizerStatus { None, Initialized, Deformed, Optimized };
+    public enum OptimizerStatus { None, Initialized, Deformed, OptimizingManual, OptimizingAll, Optimized };
     public OptimizerStatus Status { get; private set; } = OptimizerStatus.None;
 
     // MAIN METHODS
@@ -243,15 +244,15 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
     public void Optimize() {
         // if (Status != OptimizerStatus.Deformed) return;
-
         // If doing manual stepping and optimization is set up, just execute one step, until you reach the maximum specified
-        if (ManualOptimizeSteps && currentIteration > 0) {
+        if (ManualOptimizeSteps && currentIteration > 0 && Status == OptimizerStatus.OptimizingManual) {
             int result = doOptimizerStep(currentIteration);
             // If the optimization can't go further, pretend this was the last iteration
             if (result == 2) currentIteration = iterations - 1;
             // On the last iteration, print the nice message
             if (currentIteration >= iterations - 1) {
                 Debug.Log("Angular deviation: " + Enumerable.Sum(optimizedAngularDeviations));
+                Status = OptimizerStatus.Optimized;
             }
             if (saveData != null) saveData.Save();
             currentIteration++;
@@ -277,7 +278,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 Seed = seed,
                 VertexCount = originalVertices.Length,
                 DeformedAngularDeviation = Enumerable.Sum(deformedAngularDeviations),
-                DeformationMethod = "Random",
+                DeformationMethod = deformationMethod.ToString(),
                 VertexSelectionMethod = "Maximum local angular deviation, skipping if no decrease in total deviation",
                 SamplingRate = optimizeOffsetStep
             };
@@ -418,19 +419,26 @@ public class VertexNormalOptimizer : MonoBehaviour {
         };
 
         if (ManualOptimizeSteps) {
+            Status = OptimizerStatus.OptimizingManual;
             doOptimizerStep(currentIteration);
             currentIteration++;
         } else {
-            for (int i = 0; i < iterations; i++) {
-                int result = doOptimizerStep(i);
-                if (result == 2) break;
-            }
-            Debug.Log("Angular deviation: " + Enumerable.Sum(optimizedAngularDeviations));
-            if (saveData != null) saveData.Save();
+            Status = OptimizerStatus.OptimizingAll;
+            StartCoroutine(OptimizeAllIterations());
         }
         // Update status
-        Status = OptimizerStatus.Optimized;
         SwitchMesh();
+    }
+
+    private IEnumerator OptimizeAllIterations() {
+        for (int i = 0; i < iterations; i++) {
+            int result = doOptimizerStep(i);
+            if (result == 2) break;
+            yield return null;
+        }
+        Debug.Log("Angular deviation: " + Enumerable.Sum(optimizedAngularDeviations));
+        if (saveData != null) saveData.Save();
+        Status = OptimizerStatus.Optimized;
     }
 
     public void Reset() {
@@ -481,6 +489,8 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 meshFilter.sharedMesh = deformedMesh;
                 break;
             case OptimizerStatus.Optimized:
+            case OptimizerStatus.OptimizingManual:
+            case OptimizerStatus.OptimizingAll:
                 meshFilter.sharedMesh = optimizedMesh;
                 break;
         }
