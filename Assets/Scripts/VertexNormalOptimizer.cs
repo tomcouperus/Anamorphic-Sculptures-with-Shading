@@ -43,7 +43,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private int iterations = 1;
     public bool ManualOptimizeSteps = false;
     private int currentIteration = 0;
-    private const int MAX_ITERATIONS = 10000;
+    private const int MAX_ITERATIONS = 1000000;
     [SerializeField]
     private float minOptimizeOffset = -5;
     [SerializeField]
@@ -435,12 +435,11 @@ public class VertexNormalOptimizer : MonoBehaviour {
             RecalculateNormals(optimizedMesh, useSmoothShading);
             if (skip) {
                 skipAmount++;
-                if (saveData != null) saveData.SkippedIterations.Add(true);
                 return 2;
             } else {
                 skipAmount = 0;
-                if (saveData != null) saveData.SkippedIterations.Add(false);
             }
+            if (saveData != null) saveData.AcceptedIterations.Add(!skip);
             // If not skipped, finish the iteration
             optimizedNormals = optimizedMesh.normals;
             // Resort the vertices according to their new deviations
@@ -498,7 +497,10 @@ public class VertexNormalOptimizer : MonoBehaviour {
             }
             // Pick a vertex and its equivalents
             // With maximum deviation
-            int v = sortedOptimizedAngularDeviations[skipAmount].Key;
+            // int v = sortedOptimizedAngularDeviations[skipAmount].Key;
+            // Randomly
+            int v = UnityEngine.Random.Range(0, originalVertices.Length);
+
             List<int> identicalVertices = null;
             foreach ((Vector3 _, List<int> ivs) in verticesByPosition) {
                 if (ivs.Contains(v)) {
@@ -506,8 +508,11 @@ public class VertexNormalOptimizer : MonoBehaviour {
                     break;
                 }
             }
+
+            float currentLocalDeviation = optimizedAngularDeviationsMap[v];
             // Calculate temperature
             temperature = temperatureCurve.Evaluate(1 - i / (float) (iterations - 1));
+            temperature = Mathf.Lerp(minTemperature, maxTemperature, temperature);
 
             Debug.Log("Iteration: " + i + ", vertex: " + v + ", temperature: " + temperature);
 
@@ -516,7 +521,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
             // Pick a random offset that lies in the range specified in the settings
             float proposedOffset = UnityEngine.Random.Range(minOptimizeOffset, maxOptimizeOffset);
-            print("Offset: " + proposedOffset);
+            // print("Offset: " + proposedOffset);
             // Apply offset to chosen vertices
             float proposedDistance = optimizedAdjustmentDistances[v] + proposedOffset;
             Vector3 proposedPosition = adjustmentRayOrigins[v] + adjustmentRays[v] * proposedDistance;
@@ -530,16 +535,21 @@ public class VertexNormalOptimizer : MonoBehaviour {
             // Calculate proposed total deviation
             float[] proposedDeviations = CalculateAngularDeviation(originalNormals, proposedMesh.normals, reflectedNormal: deformationMethod == DeformationMethod.Mirror);
             float proposedTotalDeviation = Enumerable.Sum(proposedDeviations);
+            float proposedLocalDeviation = proposedDeviations[v];
 
-            print(currentTotalDeviation + " --> " + proposedTotalDeviation);
+            // print("Total " + currentTotalDeviation + " --> " + proposedTotalDeviation);
+            // print("Local " + currentLocalDeviation + " --> " + proposedLocalDeviation);
 
             // Determine acceptance of proposed change
             float acceptProbability = 1;
             if (proposedTotalDeviation > currentTotalDeviation) {
                 acceptProbability = Mathf.Exp(-(proposedTotalDeviation - currentTotalDeviation) / temperature);
             }
+            // if (proposedLocalDeviation > currentLocalDeviation) {
+            //     acceptProbability = Mathf.Exp(-(proposedLocalDeviation - currentLocalDeviation) / temperature);
+            // }
             bool accept = acceptProbability > UnityEngine.Random.Range(0.0f, 1.0f);
-            print("Accept: " + accept);
+            // print("Accept: " + accept);
             if (accept) {
                 // Update the mesh
                 optimizedMesh.SetVertices(proposedVertices);
@@ -556,6 +566,19 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 // Resort the deviations
                 sortedOptimizedAngularDeviations = optimizedAngularDeviationsMap.ToList();
                 sortedOptimizedAngularDeviations.Sort(SortFunctions.largeToSmallValueSorter);
+
+                // Reset the skipping
+                skipAmount = 0;
+            } else {
+                skipAmount++;
+            }
+
+            if (saveData != null) {
+                saveData.AcceptedIterations.Add(accept);
+                saveData.Offsets.Add(proposedOffset);
+                saveData.CurrentDeviations.Add(currentTotalDeviation);
+                saveData.Deviations.Add(proposedTotalDeviation);
+                saveData.Vertices.Add(v);
             }
 
             return 0;
@@ -833,7 +856,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         public List<float> Deviations;
         public List<float> CurrentDeviations;
         public List<int> Vertices;
-        public List<bool> SkippedIterations;
+        public List<bool> AcceptedIterations;
         public float[] IdealNormalAnglesFromRay;
 
         private readonly string fileName;
@@ -843,7 +866,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
             Deviations = new();
             CurrentDeviations = new();
             Vertices = new();
-            SkippedIterations = new();
+            AcceptedIterations = new();
             fileName = filename;
         }
 
