@@ -467,7 +467,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         Debug.Log("Angular deviation: " + Enumerable.Sum(optimizedAngularDeviations));
         Debug.Log("Time (ms): " + deltaTimeMillis);
         if (saveData != null) {
-            saveData.timeMilliseconds = deltaTimeMillis;
+            saveData.TimeMilliseconds = deltaTimeMillis;
             saveData.FinalVertices = optimizedVertices;
             saveData.Save();
         }
@@ -849,7 +849,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     [Serializable]
     private class VertexNormalOptimizerData {
         public string ObjectName;
-        public int timeMilliseconds;
+        public int TimeMilliseconds;
         public int Seed;
         public int VertexCount;
         public float DeformedAngularDeviation;
@@ -872,7 +872,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
             CurrentDeviations = new();
             ChosenVertices = new();
             AcceptedIterations = new();
-            timeMilliseconds = 0;
+            TimeMilliseconds = 0;
         }
 
         private string FileName() {

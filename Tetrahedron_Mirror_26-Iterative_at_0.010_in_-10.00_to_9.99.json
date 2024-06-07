@@ -1,6 +1,6 @@
 {
     "ObjectName": "Tetrahedron",
-    "timeMilliseconds": 1330,
+    "TimeMilliseconds": 1330,
     "Seed": 0,
     "VertexCount": 12,
     "DeformedAngularDeviation": 229.306640625,
