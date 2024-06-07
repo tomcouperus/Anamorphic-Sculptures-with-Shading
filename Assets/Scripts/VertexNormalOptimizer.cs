@@ -494,6 +494,11 @@ public class VertexNormalOptimizer : MonoBehaviour {
         sortedOptimizedAngularDeviations.Sort(SortFunctions.largeToSmallValueSorter);
         int skipAmount = 0;
 
+        // Do some save data
+        if (saveData != null) {
+            saveData.VertexSelectionMethod = "Random";
+        }
+
         // Initialize time fraction
         float temperature;
 
@@ -578,9 +583,9 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 sortedOptimizedAngularDeviations.Sort(SortFunctions.largeToSmallValueSorter);
 
                 // Reset the skipping
-                skipAmount = 0;
+                // skipAmount = 0;
             } else {
-                skipAmount++;
+                // skipAmount++;
             }
 
             if (saveData != null) {
