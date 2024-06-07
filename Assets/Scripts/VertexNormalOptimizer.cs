@@ -873,7 +873,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
             if (OptimizerMethod == OptimizerMethod.Iterative) {
                 filename += "_at_" + SamplingRate.ToString("0.000");
             }
-            filename += "_in_" + Offsets[0].ToString("0.00") + "_to_" + Offsets[^1].ToString("0.00");
+            filename += "_in_" + Enumerable.Min(Offsets).ToString("0.00") + "_to_" + Enumerable.Max(Offsets).ToString("0.00");
             return filename;
         }
 

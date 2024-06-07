@@ -26,7 +26,7 @@ PrefabInstance:
     - target: {fileID: -7511558181221131132, guid: 322f3419c06274164afb503bfa50ea93, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 38bf1a19326444635afd60fefa1489bd, type: 2}
+      objectReference: {fileID: 10302, guid: 0000000000000000f000000000000000, type: 0}
     - target: {fileID: 919132149155446097, guid: 322f3419c06274164afb503bfa50ea93, type: 3}
       propertyPath: m_Name
       value: High Vertex Cube
@@ -46,20 +46,6 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 322f3419c06274164afb503bfa50ea93, type: 3}
   m_PrefabInstance: {fileID: 768961153432193500}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &6186678524499992759
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 462340008035726477}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: faa73673f3002469abb2128705272c46, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  meshIsContinuous: 1
-  normalsAreContinuous: 0
 --- !u!65 &6515819141655738522
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -73,3 +59,17 @@ BoxCollider:
   serializedVersion: 2
   m_Size: {x: 2, y: 2, z: 2}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &6186678524499992759
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 462340008035726477}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: faa73673f3002469abb2128705272c46, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  meshIsContinuous: 1
+  useSmoothShading: 0
