@@ -288,14 +288,15 @@ public class VertexNormalOptimizer : MonoBehaviour {
         // If having the saving enabled, make the save data
         saveData = null;
         if (writeToFile) {
-            saveData = new(FileName()) {
+            saveData = new() {
                 ObjectName = originalObjects[originalObjectIndex].gameObject.name,
                 Seed = seed,
                 VertexCount = originalVertices.Length,
                 DeformedAngularDeviation = Enumerable.Sum(deformedAngularDeviations),
-                DeformationMethod = deformationMethod.ToString()
+                DeformationMethod = deformationMethod,
+                OptimizerMethod = optimizerMethod,
+                IdealNormalAnglesFromRay = new float[originalNormals.Length]
             };
-            saveData.IdealNormalAnglesFromRay = new float[originalNormals.Length];
             for (int i = 0; i < originalNormals.Length; i++) {
                 saveData.IdealNormalAnglesFromRay[i] = Vector3.Angle(adjustmentRays[i], originalNormals[i]);
             }
@@ -411,7 +412,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 }
                 saveData.Deviations.AddRange(sortedDeviations);
                 // Save the current vertex
-                saveData.Vertices.Add(v);
+                saveData.ChosenVertices.Add(v);
                 // Save this iteration's initial total deviation that is has to decrease
                 saveData.CurrentDeviations.Add(Enumerable.Sum(optimizedAngularDeviations));
             }
@@ -460,7 +461,10 @@ public class VertexNormalOptimizer : MonoBehaviour {
             yield return null;
         }
         Debug.Log("Angular deviation: " + Enumerable.Sum(optimizedAngularDeviations));
-        if (saveData != null) saveData.Save();
+        if (saveData != null) {
+            saveData.FinalVertices = optimizedVertices;
+            saveData.Save();
+        }
         Status = OptimizerStatus.Optimized;
     }
 
@@ -578,7 +582,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 saveData.Offsets.Add(proposedOffset);
                 saveData.CurrentDeviations.Add(currentTotalDeviation);
                 saveData.Deviations.Add(proposedTotalDeviation);
-                saveData.Vertices.Add(v);
+                saveData.ChosenVertices.Add(v);
             }
 
             return 0;
@@ -721,13 +725,6 @@ public class VertexNormalOptimizer : MonoBehaviour {
         return angularDeviations;
     }
 
-    private string FileName() {
-        string filename = originalObjects[originalObjectIndex].name;
-        filename += "_" + optimizerMethod.ToString();
-        filename += "_(" + minOptimizeOffset.ToString("0.00") + "_" + optimizeOffsetStep.ToString("0.000") + "_" + maxOptimizeOffset.ToString("0.00") + ")";
-        return filename;
-    }
-
     // DEBUG METHODS
 #if UNITY_EDITOR
     private void DrawInitializedGizmos() {
@@ -849,30 +846,40 @@ public class VertexNormalOptimizer : MonoBehaviour {
         public int Seed;
         public int VertexCount;
         public float DeformedAngularDeviation;
-        public string DeformationMethod;
+        public DeformationMethod DeformationMethod;
         public string VertexSelectionMethod;
+        public OptimizerMethod OptimizerMethod;
         public float SamplingRate;
         public List<float> Offsets;
         public List<float> Deviations;
         public List<float> CurrentDeviations;
-        public List<int> Vertices;
+        public List<int> ChosenVertices;
         public List<bool> AcceptedIterations;
         public float[] IdealNormalAnglesFromRay;
+        public Vector3[] FinalVertices;
 
-        private readonly string fileName;
-
-        public VertexNormalOptimizerData(string filename) {
+        public VertexNormalOptimizerData() {
             Offsets = new();
             Deviations = new();
             CurrentDeviations = new();
-            Vertices = new();
+            ChosenVertices = new();
             AcceptedIterations = new();
-            fileName = filename;
+        }
+
+        private string FileName() {
+            string filename = ObjectName.Replace(' ', '_');
+            filename += "_" + DeformationMethod.ToString();
+            filename += "_" + ChosenVertices.Count + "-" + OptimizerMethod.ToString();
+            if (OptimizerMethod == OptimizerMethod.Iterative) {
+                filename += "_at_" + SamplingRate.ToString("0.000");
+            }
+            filename += "_in_" + Offsets[0].ToString("0.00") + "_to_" + Offsets[^1].ToString("0.00");
+            return filename;
         }
 
         public void Save() {
             string jsonString = JsonUtility.ToJson(this);
-            string path = "./" + fileName + ".json";
+            string path = "./" + FileName() + ".json";
             System.IO.File.WriteAllText(path, jsonString);
         }
     }
