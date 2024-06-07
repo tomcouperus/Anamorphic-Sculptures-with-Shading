@@ -295,7 +295,8 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 DeformedAngularDeviation = Enumerable.Sum(deformedAngularDeviations),
                 DeformationMethod = deformationMethod,
                 OptimizerMethod = optimizerMethod,
-                IdealNormalAnglesFromRay = new float[originalNormals.Length]
+                IdealNormalAnglesFromRay = new float[originalNormals.Length],
+                Triangles = optimizedMesh.triangles
             };
             for (int i = 0; i < originalNormals.Length; i++) {
                 saveData.IdealNormalAnglesFromRay[i] = Vector3.Angle(adjustmentRays[i], originalNormals[i]);
@@ -364,7 +365,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 return 1;
             }
             int v = sortedOptimizedAngularDeviations[skipAmount].Key;
-            // Debug.Log("Iteration: " + i + ", vertex: " + v);
+            Debug.Log("Iteration: " + i + ", vertex: " + v);
             Vector3[] newVertices = (Vector3[]) optimizedVertices.Clone();
 
             // Find the set of identical vertices containing v
@@ -432,6 +433,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
                     optimizedAdjustmentDistances[vi] = optimalDistance;
                 }
             }
+            if (saveData != null) saveData.AcceptedIterations.Add(!skip);
             optimizedMesh.SetVertices(optimizedVertices);
             RecalculateNormals(optimizedMesh, useSmoothShading);
             if (skip) {
@@ -440,7 +442,6 @@ public class VertexNormalOptimizer : MonoBehaviour {
             } else {
                 skipAmount = 0;
             }
-            if (saveData != null) saveData.AcceptedIterations.Add(!skip);
             // If not skipped, finish the iteration
             optimizedNormals = optimizedMesh.normals;
             // Resort the vertices according to their new deviations
@@ -455,13 +456,18 @@ public class VertexNormalOptimizer : MonoBehaviour {
     }
 
     private IEnumerator OptimizeAllIterations() {
+        float timeStart = Time.time;
         for (int i = 0; i < iterations; i++) {
             int result = doOptimizerStep(i);
             if (result == 1) break;
             yield return null;
         }
+        float timeEnd = Time.time;
+        int deltaTimeMillis = (int) ((timeEnd - timeStart) * 1000);
         Debug.Log("Angular deviation: " + Enumerable.Sum(optimizedAngularDeviations));
+        Debug.Log("Time (ms): " + deltaTimeMillis);
         if (saveData != null) {
+            saveData.timeMilliseconds = deltaTimeMillis;
             saveData.FinalVertices = optimizedVertices;
             saveData.Save();
         }
@@ -843,6 +849,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     [Serializable]
     private class VertexNormalOptimizerData {
         public string ObjectName;
+        public int timeMilliseconds;
         public int Seed;
         public int VertexCount;
         public float DeformedAngularDeviation;
@@ -857,6 +864,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         public List<bool> AcceptedIterations;
         public float[] IdealNormalAnglesFromRay;
         public Vector3[] FinalVertices;
+        public int[] Triangles;
 
         public VertexNormalOptimizerData() {
             Offsets = new();
@@ -864,6 +872,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
             CurrentDeviations = new();
             ChosenVertices = new();
             AcceptedIterations = new();
+            timeMilliseconds = 0;
         }
 
         private string FileName() {
