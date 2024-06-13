@@ -65,6 +65,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
     [Header("Status: Initialized -- variables")]
     private Mesh originalMesh;
+    [SerializeField]
     private Vector3[] originalVertices;
     private Vector3[] originalNormals;
     private Vector3[] adjustmentRayOrigins;
@@ -591,6 +592,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
             if (saveData != null) {
                 saveData.AcceptedIterations.Add(accept);
                 saveData.Offsets.Add(proposedOffset);
+                saveData.Temperatures.Add(temperature);
                 saveData.CurrentDeviations.Add(currentTotalDeviation);
                 saveData.Deviations.Add(proposedTotalDeviation);
                 saveData.ChosenVertices.Add(v);
@@ -863,6 +865,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         public OptimizerMethod OptimizerMethod;
         public float SamplingRate;
         public List<float> Offsets;
+        public List<float> Temperatures;
         public List<float> Deviations;
         public List<float> CurrentDeviations;
         public List<int> ChosenVertices;
@@ -873,6 +876,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
         public VertexNormalOptimizerData() {
             Offsets = new();
+            Temperatures = new();
             Deviations = new();
             CurrentDeviations = new();
             ChosenVertices = new();
@@ -888,6 +892,9 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 filename += "_at_" + SamplingRate.ToString("0.000");
             }
             filename += "_in_" + Enumerable.Min(Offsets).ToString("0.00") + "_to_" + Enumerable.Max(Offsets).ToString("0.00");
+            if (OptimizerMethod == OptimizerMethod.Annealing) {
+                filename += "_temp_" + Temperatures[0].ToString("0.00") + "_to_" + Temperatures[^1].ToString("0.00");
+            }
             return filename;
         }
 
