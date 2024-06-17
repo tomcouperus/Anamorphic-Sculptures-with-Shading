@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.VisualScripting;
+using UnityEditor.PackageManager;
 using UnityEngine;
 
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
@@ -16,6 +17,8 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private MeshFilter[] originalObjects;
     [SerializeField]
     private int originalObjectIndex;
+    [SerializeField]
+    private bool showOriginalObject;
     [SerializeField]
     private bool useSmoothShading;
     [SerializeField]
@@ -34,6 +37,10 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private Mirror mirror;
     [SerializeField]
     private float maxRaycastDistance = 20;
+    [SerializeField]
+    private float minDeformationOffset = -1;
+    [SerializeField]
+    private float maxDeformationOffset = 1;
 
     private enum OptimizerMethod { Iterative, Annealing };
     [Header("Optimizer Settings")]
@@ -58,10 +65,10 @@ public class VertexNormalOptimizer : MonoBehaviour {
     [SerializeField]
     private AnimationCurve temperatureCurve;
 
-    [Header("Save settings")]
+    private enum SmoothingMethod { Laplacian };
+    [Header("Smoothing Settings")]
     [SerializeField]
-    private bool writeToFile;
-    private VertexNormalOptimizerData saveData;
+    private SmoothingMethod smoothingMethod = SmoothingMethod.Laplacian;
 
     [Header("Status: Initialized -- variables")]
     private Mesh originalMesh;
@@ -88,8 +95,20 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private float[] optimizedAdjustmentDistances;
     private float[] optimizedAngularDeviations;
     private Dictionary<float, float> offsetTotalDeviationMap;
-    private Func<int, int> doOptimizerStep;
+    private Func<int, int> optimizerStepFunction;
     private readonly Color GIZMOS_OPTIMIZED_COLOR = Color.magenta;
+
+    [Header("Status: Smoothed -- variables")]
+    private Mesh smoothedMesh;
+    private Vector3[] smoothedVertices;
+    private Vector3[] smoothedNormals;
+    private int smoothingSteps;
+    private float[] smoothenedAngularDeviations;
+    private Func<int, int> smoothingStepFunction;
+
+    [Header("Save information")]
+    private VertexNormalOptimizerData saveData;
+
 
 
     private const float GIZMO_SPHERE_RADIUS = 0.05f;
@@ -121,7 +140,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     private bool showOffsetDeviationMap = false;
 
 
-    public enum OptimizerStatus { None, Initialized, Deformed, OptimizingManual, OptimizingAll, Optimized };
+    public enum OptimizerStatus { None, Initialized, Deformed, OptimizingManual, OptimizingAll, Optimized, SmoothingLaplacian, Smoothed };
     public OptimizerStatus Status { get; private set; } = OptimizerStatus.None;
 
     // MAIN METHODS
@@ -232,7 +251,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         Dictionary<Vector3, List<int>> verticesByPosition = GroupVerticesByLocation(originalVertices);
         foreach ((Vector3 position, List<int> identicalVertices) in verticesByPosition) {
             // Determine the new distance
-            float offset = UnityEngine.Random.Range(-1f, 1f);
+            float offset = UnityEngine.Random.Range(minDeformationOffset, maxDeformationOffset);
             float newDistance = originalAdjustmentDistances[identicalVertices[0]] + offset;
             // Apply it to all identical vertices
             foreach (int vi in identicalVertices) {
@@ -256,7 +275,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         // if (Status != OptimizerStatus.Deformed) return;
         // If doing manual stepping and optimization is set up, just execute one step, until you reach the maximum specified
         if (ManualOptimizeSteps && currentIteration > 0 && Status == OptimizerStatus.OptimizingManual) {
-            int result = doOptimizerStep(currentIteration);
+            int result = optimizerStepFunction(currentIteration);
             // If the optimization can't go further, pretend this was the last iteration
             if (result == 2) currentIteration = iterations - 1;
             // On the last iteration, print the nice message
@@ -264,7 +283,6 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 Debug.Log("Angular deviation: " + Enumerable.Sum(optimizedAngularDeviations));
                 Status = OptimizerStatus.Optimized;
             }
-            if (saveData != null) saveData.Save();
             currentIteration++;
             return;
         }
@@ -287,35 +305,32 @@ public class VertexNormalOptimizer : MonoBehaviour {
         optimizedMesh.SetUVs(3, originalNormals);
 
         // If having the saving enabled, make the save data
-        saveData = null;
-        if (writeToFile) {
-            saveData = new() {
-                ObjectName = originalObjects[originalObjectIndex].gameObject.name,
-                Seed = seed,
-                VertexCount = originalVertices.Length,
-                DeformedAngularDeviation = Enumerable.Sum(deformedAngularDeviations),
-                DeformationMethod = deformationMethod,
-                OptimizerMethod = optimizerMethod,
-                IdealNormalAnglesFromRay = new float[originalNormals.Length],
-                Triangles = optimizedMesh.triangles
-            };
-            for (int i = 0; i < originalNormals.Length; i++) {
-                saveData.IdealNormalAnglesFromRay[i] = Vector3.Angle(adjustmentRays[i], originalNormals[i]);
-            }
+        saveData = new() {
+            ObjectName = originalObjects[originalObjectIndex].gameObject.name,
+            Seed = seed,
+            VertexCount = originalVertices.Length,
+            DeformedAngularDeviation = Enumerable.Sum(deformedAngularDeviations),
+            DeformationMethod = deformationMethod,
+            OptimizerMethod = optimizerMethod,
+            IdealNormalAnglesFromRay = new float[originalNormals.Length],
+            Triangles = optimizedMesh.triangles
+        };
+        for (int i = 0; i < originalNormals.Length; i++) {
+            saveData.IdealNormalAnglesFromRay[i] = Vector3.Angle(adjustmentRays[i], originalNormals[i]);
         }
 
         switch (optimizerMethod) {
             case OptimizerMethod.Iterative:
-                doOptimizerStep = OptimizeIterative();
+                optimizerStepFunction = OptimizeIterative();
                 break;
             case OptimizerMethod.Annealing:
-                doOptimizerStep = OptimizeAnnealing();
+                optimizerStepFunction = OptimizeAnnealing();
                 break;
         }
 
         if (ManualOptimizeSteps) {
             Status = OptimizerStatus.OptimizingManual;
-            doOptimizerStep(currentIteration);
+            optimizerStepFunction(currentIteration);
             currentIteration++;
         } else {
             Status = OptimizerStatus.OptimizingAll;
@@ -323,6 +338,22 @@ public class VertexNormalOptimizer : MonoBehaviour {
         }
         // Update status
         SwitchMesh();
+    }
+
+    private IEnumerator OptimizeAllIterations() {
+        float timeStart = Time.time;
+        for (int i = 0; i < iterations; i++) {
+            int result = optimizerStepFunction(i);
+            if (result == 1) break;
+            yield return null;
+        }
+        float timeEnd = Time.time;
+        int deltaTimeMillis = (int) ((timeEnd - timeStart) * 1000);
+        Debug.Log("Angular deviation: " + Enumerable.Sum(optimizedAngularDeviations));
+        Debug.Log("Time (ms): " + deltaTimeMillis);
+        saveData.TimeMilliseconds = deltaTimeMillis;
+        saveData.FinalVertices = optimizedVertices;
+        Status = OptimizerStatus.Optimized;
     }
 
     // Creates a function that outputs 0 if no problem was in the iteration, 1 if a vertex was skipped, and 2 if the process should halt.
@@ -336,11 +367,9 @@ public class VertexNormalOptimizer : MonoBehaviour {
         }
 
         // Add method specific savedata
-        if (saveData != null) {
-            saveData.VertexSelectionMethod = "Maximum local angular deviation, skipping if no decrease in total deviation";
-            saveData.Offsets.AddRange(offsets);
-            saveData.SamplingRate = optimizeOffsetStep;
-        }
+        saveData.VertexSelectionMethod = "Maximum local angular deviation, skipping if no decrease in total deviation";
+        saveData.Offsets.AddRange(offsets);
+        saveData.SamplingRate = optimizeOffsetStep;
 
         // Only optimize the unique vertices
         Dictionary<Vector3, List<int>> verticesByPosition = GroupVerticesByLocation(originalVertices);
@@ -403,21 +432,18 @@ public class VertexNormalOptimizer : MonoBehaviour {
             // Apply this optimal offset to all identical vertices
             float optimalOffset = sortedOffsetTotalDeviations[0].Key;
 
-            // If we're actually saving
-            if (saveData != null) {
-                // Save the deviations of this iteration sorted by offset
-                List<KeyValuePair<float, float>> deviationsSortedByOffset = offsetTotalDeviationMap.ToList();
-                deviationsSortedByOffset.Sort(SortFunctions.smallToLargeKeySorter);
-                List<float> sortedDeviations = new();
-                foreach ((float _, float deviation) in deviationsSortedByOffset) {
-                    sortedDeviations.Add(deviation);
-                }
-                saveData.Deviations.AddRange(sortedDeviations);
-                // Save the current vertex
-                saveData.ChosenVertices.Add(v);
-                // Save this iteration's initial total deviation that is has to decrease
-                saveData.CurrentDeviations.Add(Enumerable.Sum(optimizedAngularDeviations));
+            // Save the deviations of this iteration sorted by offset
+            List<KeyValuePair<float, float>> deviationsSortedByOffset = offsetTotalDeviationMap.ToList();
+            deviationsSortedByOffset.Sort(SortFunctions.smallToLargeKeySorter);
+            List<float> sortedDeviations = new();
+            foreach ((float _, float deviation) in deviationsSortedByOffset) {
+                sortedDeviations.Add(deviation);
             }
+            saveData.OptimizedDeviations.AddRange(sortedDeviations);
+            // Save the current vertex
+            saveData.ChosenVertices.Add(v);
+            // Save this iteration's initial total deviation that is has to decrease
+            saveData.CurrentDeviations.Add(Enumerable.Sum(optimizedAngularDeviations));
 
             // Check if the vertex changes or not, and skip move the next iteration forward if it doesn't.
             bool skip = false;
@@ -434,7 +460,9 @@ public class VertexNormalOptimizer : MonoBehaviour {
                     optimizedAdjustmentDistances[vi] = optimalDistance;
                 }
             }
-            if (saveData != null) saveData.AcceptedIterations.Add(!skip);
+
+            saveData.AcceptedIterations.Add(!skip);
+
             optimizedMesh.SetVertices(optimizedVertices);
             RecalculateNormals(optimizedMesh, useSmoothShading);
             if (skip) {
@@ -454,25 +482,6 @@ public class VertexNormalOptimizer : MonoBehaviour {
             sortedOptimizedAngularDeviations.Sort(SortFunctions.largeToSmallValueSorter);
             return 0;
         };
-    }
-
-    private IEnumerator OptimizeAllIterations() {
-        float timeStart = Time.time;
-        for (int i = 0; i < iterations; i++) {
-            int result = doOptimizerStep(i);
-            if (result == 1) break;
-            yield return null;
-        }
-        float timeEnd = Time.time;
-        int deltaTimeMillis = (int) ((timeEnd - timeStart) * 1000);
-        Debug.Log("Angular deviation: " + Enumerable.Sum(optimizedAngularDeviations));
-        Debug.Log("Time (ms): " + deltaTimeMillis);
-        if (saveData != null) {
-            saveData.TimeMilliseconds = deltaTimeMillis;
-            saveData.FinalVertices = optimizedVertices;
-            saveData.Save();
-        }
-        Status = OptimizerStatus.Optimized;
     }
 
     // Creates a function that returns 0 if no problems in an iteration, and 1 if the process should halt.
@@ -496,9 +505,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         int skipAmount = 0;
 
         // Do some save data
-        if (saveData != null) {
-            saveData.VertexSelectionMethod = "Random";
-        }
+        saveData.VertexSelectionMethod = "Random";
 
         // Initialize time fraction
         float temperature;
@@ -589,17 +596,77 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 // skipAmount++;
             }
 
-            if (saveData != null) {
-                saveData.AcceptedIterations.Add(accept);
-                saveData.Offsets.Add(proposedOffset);
-                saveData.Temperatures.Add(temperature);
-                saveData.CurrentDeviations.Add(currentTotalDeviation);
-                saveData.Deviations.Add(proposedTotalDeviation);
-                saveData.ChosenVertices.Add(v);
-            }
+            // Savedata
+            saveData.AcceptedIterations.Add(accept);
+            saveData.Offsets.Add(proposedOffset);
+            saveData.Temperatures.Add(temperature);
+            saveData.CurrentDeviations.Add(currentTotalDeviation);
+            saveData.OptimizedDeviations.Add(proposedTotalDeviation);
+            saveData.ChosenVertices.Add(v);
 
             return 0;
         };
+    }
+
+    public void Smoothen() {
+        Debug.Log("Smoothing");
+        // Initialize the smooth mesh
+        smoothedMesh = new Mesh();
+        smoothedVertices = (Vector3[]) optimizedVertices.Clone();
+        smoothedNormals = (Vector3[]) optimizedNormals.Clone();
+        smoothedMesh.SetVertices(smoothedVertices);
+        smoothedMesh.SetTriangles(optimizedMesh.triangles, 0);
+        smoothedMesh.SetUVs(3, originalNormals);
+
+
+        // Initialize the smoothing function
+        switch (smoothingMethod) {
+            case SmoothingMethod.Laplacian:
+                Status = OptimizerStatus.SmoothingLaplacian;
+                smoothingStepFunction = SmoothLaplacian();
+                break;
+        }
+
+        // Save data
+        saveData.Smoothened = true;
+        saveData.SmoothingMethod = smoothingMethod;
+
+        // Start the enumerator
+        StartCoroutine(SmoothingIterative());
+    }
+
+    private IEnumerator SmoothingIterative() {
+        for (int i = 0; i < smoothingSteps; i++) {
+            smoothingStepFunction(i);
+            yield return null;
+        }
+        // Recalculate normals after smoothing
+        RecalculateNormals(smoothedMesh, useSmoothShading);
+
+        // Calculate final deviation and save it
+        smoothenedAngularDeviations = CalculateAngularDeviation(smoothedNormals, originalNormals, reflectedNormal: deformationMethod == DeformationMethod.Mirror);
+        saveData.SmoothenedAngularDeviation = Enumerable.Sum(smoothenedAngularDeviations);
+        Debug.Log("Angular deviation: " + saveData.SmoothenedAngularDeviation);
+
+        // Set the status
+        Status = OptimizerStatus.Smoothed;
+    }
+
+    private Func<int, int> SmoothLaplacian() {
+        smoothingSteps = smoothedVertices.Length;
+        return (int i) => {
+            Debug.Log("Smoothing vertex " + i);
+            return 0;
+        };
+    }
+
+    public void Save() {
+        if (Status != OptimizerStatus.None && saveData != null) {
+            Debug.Log("Saved as " + saveData.FileName());
+            saveData.Save();
+        } else {
+            Debug.LogError("Failed to save. Status: " + Status.ToString());
+        }
     }
 
     public void Reset() {
@@ -630,7 +697,15 @@ public class VertexNormalOptimizer : MonoBehaviour {
         optimizedAdjustmentDistances = null;
         optimizedAngularDeviations = null;
         offsetTotalDeviationMap = null;
-        doOptimizerStep = null;
+        optimizerStepFunction = null;
+
+        // Status: Smoothed -- variables
+        smoothedMesh = null;
+        smoothedVertices = null;
+        smoothedNormals = null;
+        smoothingStepFunction = null;
+        smoothingSteps = 0;
+        smoothenedAngularDeviations = null;
 
         // Update status
         Status = OptimizerStatus.None;
@@ -653,6 +728,10 @@ public class VertexNormalOptimizer : MonoBehaviour {
             case OptimizerStatus.OptimizingManual:
             case OptimizerStatus.OptimizingAll:
                 meshFilter.sharedMesh = optimizedMesh;
+                break;
+            case OptimizerStatus.SmoothingLaplacian:
+            case OptimizerStatus.Smoothed:
+                meshFilter.sharedMesh = smoothedMesh;
                 break;
         }
     }
@@ -823,7 +902,8 @@ public class VertexNormalOptimizer : MonoBehaviour {
         if (originalObjectIndex < 0) originalObjectIndex = 0;
         if (originalObjectIndex >= originalObjects.Length) originalObjectIndex = originalObjects.Length - 1;
         for (int i = 0; i < originalObjects.Length; i++) {
-            originalObjects[i].gameObject.SetActive(i == originalObjectIndex);
+            bool activate = showOriginalObject && i == originalObjectIndex;
+            originalObjects[i].gameObject.SetActive(activate);
         }
         // Iteration selection
         if (iterations < 1) iterations = 1;
@@ -855,6 +935,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     // Save data class
     [Serializable]
     private class VertexNormalOptimizerData {
+        // Static data
         public string ObjectName;
         public int TimeMilliseconds;
         public int Seed;
@@ -864,27 +945,34 @@ public class VertexNormalOptimizer : MonoBehaviour {
         public string VertexSelectionMethod;
         public OptimizerMethod OptimizerMethod;
         public float SamplingRate;
-        public List<float> Offsets;
-        public List<float> Temperatures;
-        public List<float> Deviations;
-        public List<float> CurrentDeviations;
+        public bool Smoothened;
+        public SmoothingMethod SmoothingMethod;
+        public float SmoothenedAngularDeviation;
+        // Iteration data
         public List<int> ChosenVertices;
+        public List<float> Temperatures;
+        public List<float> Offsets;
         public List<bool> AcceptedIterations;
+        // Deviations
+        public List<float> OptimizedDeviations;
+        public List<float> CurrentDeviations;
+        // Misc info
         public float[] IdealNormalAnglesFromRay;
+        // Final mesh
         public Vector3[] FinalVertices;
         public int[] Triangles;
 
         public VertexNormalOptimizerData() {
             Offsets = new();
             Temperatures = new();
-            Deviations = new();
+            OptimizedDeviations = new();
             CurrentDeviations = new();
             ChosenVertices = new();
             AcceptedIterations = new();
             TimeMilliseconds = 0;
         }
 
-        private string FileName() {
+        public string FileName() {
             string filename = ObjectName.Replace(' ', '_');
             filename += "_" + DeformationMethod.ToString();
             filename += "_" + ChosenVertices.Count + "-" + OptimizerMethod.ToString();
@@ -894,6 +982,9 @@ public class VertexNormalOptimizer : MonoBehaviour {
             filename += "_in_" + Enumerable.Min(Offsets).ToString("0.00") + "_to_" + Enumerable.Max(Offsets).ToString("0.00");
             if (OptimizerMethod == OptimizerMethod.Annealing) {
                 filename += "_temp_" + Temperatures[0].ToString("0.00") + "_to_" + Temperatures[^1].ToString("0.00");
+            }
+            if (Smoothened) {
+                filename += "_" + SmoothingMethod.ToString() + "_";
             }
             return filename;
         }

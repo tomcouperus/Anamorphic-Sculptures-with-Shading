@@ -22,6 +22,14 @@ public class VertexNormalOptimizer_Inspector : Editor {
                 vertexNormalOptimizer.Optimize();
             }
         }
+        if (vertexNormalOptimizer.Status == VertexNormalOptimizer.OptimizerStatus.Optimized) {
+            if (GUILayout.Button("Smoothen")) {
+                vertexNormalOptimizer.Smoothen();
+            }
+        }
+        if (GUILayout.Button("Save")) {
+            vertexNormalOptimizer.Save();
+        }
         if (GUILayout.Button("Reset")) {
             vertexNormalOptimizer.Reset();
         }
