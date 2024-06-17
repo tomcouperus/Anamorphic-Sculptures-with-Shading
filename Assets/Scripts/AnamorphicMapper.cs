@@ -73,6 +73,8 @@ public class AnamorphicMapper : MonoBehaviour {
     private bool[] occludedVertices = null;
 
     [SerializeField]
+    private float gizmoSphereSize = 1;
+    [SerializeField]
     private bool showMeshVertices = false;
     [SerializeField]
     private bool showMeshNormals = false;
@@ -811,7 +813,7 @@ public class AnamorphicMapper : MonoBehaviour {
         Status = MappingStatus.None;
     }
 
-    private void OnDrawGizmosSelected() {
+    private void OnDrawGizmos() {
         Vector3 origin = viewPosition.position;
 
         // Original mesh
@@ -829,7 +831,7 @@ public class AnamorphicMapper : MonoBehaviour {
                     // Normal vertex
                     Gizmos.color = Color.white;
                 }
-                Gizmos.DrawSphere(globalMeshVertices[i], radius);
+                Gizmos.DrawSphere(globalMeshVertices[i], radius * gizmoSphereSize);
             }
         }
         // Original normals
@@ -864,7 +866,7 @@ public class AnamorphicMapper : MonoBehaviour {
         if (showMirrorHits && mirrorHits != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax && i < mirrorHits.Length; i++) {
                 for (int r = 0; r < numReflections[i]; r++) {
-                    Gizmos.DrawSphere(mirrorHits[i, r], GIZMO_SPHERE_RADIUS);
+                    Gizmos.DrawSphere(mirrorHits[i, r], GIZMO_SPHERE_RADIUS * gizmoSphereSize);
                 }
             }
         }
@@ -893,7 +895,7 @@ public class AnamorphicMapper : MonoBehaviour {
         if (showMappedVertices && mappedVertices != null && Status != MappingStatus.None) {
             for (int i = (int) showMin; i <= showMax && i < mappedVertices.Length; i++) {
                 if (numReflections[i] == 0) continue;
-                Gizmos.DrawSphere(mappedVertices[i], GIZMO_SPHERE_RADIUS);
+                Gizmos.DrawSphere(mappedVertices[i], GIZMO_SPHERE_RADIUS * gizmoSphereSize);
             }
         }
         // Normals of mapped vertices
@@ -917,7 +919,7 @@ public class AnamorphicMapper : MonoBehaviour {
         if (showOptimizedVertices && optimizedVertices != null && Status == MappingStatus.Optimized) {
             for (int i = (int) showMin; i <= showMax && i < optimizedVertices.Length; i++) {
                 if (numReflections[i] == 0) continue;
-                Gizmos.DrawSphere(optimizedVertices[i], GIZMO_SPHERE_RADIUS);
+                Gizmos.DrawSphere(optimizedVertices[i], GIZMO_SPHERE_RADIUS * gizmoSphereSize);
             }
         }
         // Normals of mapped vertices after optimization
