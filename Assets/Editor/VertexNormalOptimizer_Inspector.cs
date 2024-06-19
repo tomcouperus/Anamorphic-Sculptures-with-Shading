@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 [CustomEditor(typeof(VertexNormalOptimizer))]
@@ -22,7 +20,7 @@ public class VertexNormalOptimizer_Inspector : Editor {
                 vertexNormalOptimizer.Optimize();
             }
         }
-        if (vertexNormalOptimizer.Status == VertexNormalOptimizer.OptimizerStatus.Optimized) {
+        if (vertexNormalOptimizer.Status == VertexNormalOptimizer.OptimizerStatus.Optimized || vertexNormalOptimizer.Status == VertexNormalOptimizer.OptimizerStatus.Smoothed) {
             if (GUILayout.Button("Smoothen")) {
                 vertexNormalOptimizer.Smoothen();
             }

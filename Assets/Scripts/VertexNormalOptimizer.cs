@@ -68,6 +68,9 @@ public class VertexNormalOptimizer : MonoBehaviour {
     [Header("Smoothing Settings")]
     [SerializeField]
     private SmoothingMethod smoothingMethod = SmoothingMethod.Laplacian;
+    [SerializeField]
+    [Range(0, 1)]
+    private float smoothStrength = 0.1f;
 
     [Header("Status: Initialized -- variables")]
     private Mesh originalMesh;
@@ -608,7 +611,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
     }
 
     public void Smoothen() {
-        Debug.Log("Smoothing");
+        Debug.Log("Smoothing with " + smoothingMethod.ToString() + " at strength: " + smoothStrength.ToString("0.00"));
         // Initialize the smooth mesh
         smoothedMesh = new Mesh();
         smoothedVertices = (Vector3[]) optimizedVertices.Clone();
@@ -629,6 +632,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         // Save data
         saveData.Smoothened = true;
         saveData.SmoothingMethod = smoothingMethod;
+        saveData.SmoothingStrength = smoothStrength;
 
         // Start the enumerator
         StartCoroutine(SmoothingIterative());
@@ -643,6 +647,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         }
         // Recalculate normals after smoothing
         RecalculateNormals(smoothedMesh, useSmoothShading);
+        smoothedNormals = smoothedMesh.normals;
 
         // Calculate final deviation and save it
         smoothenedAngularDeviations = CalculateAngularDeviation(smoothedNormals, originalNormals, reflectedNormal: deformationMethod == DeformationMethod.Mirror);
@@ -671,6 +676,10 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 smoothPosition += optimizedVertices[ni];
             }
             smoothPosition /= neighbours.Count;
+            smoothPosition = Vector3.Lerp(smoothedVertices[i], smoothPosition, smoothStrength);
+
+            // Project the smoothed position back onto the adjustment ray
+            smoothPosition = MathUtilities.NearestPointOnLine(adjustmentRayOrigins[i], adjustmentRays[i], smoothPosition);
 
             // Set new position
             smoothedVertices[i] = smoothPosition;
@@ -1005,6 +1014,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         // Smoothing
         public bool Smoothened;
         public SmoothingMethod SmoothingMethod;
+        public float SmoothingStrength;
         public float SmoothenedAngularDeviation;
         // Iteration data
         public List<int> ChosenVertices;
@@ -1037,12 +1047,12 @@ public class VertexNormalOptimizer : MonoBehaviour {
             if (OptimizerMethod == OptimizerMethod.Iterative) {
                 filename += "_at_" + SamplingRate.ToString("0.000");
             }
-            filename += "_in_" + Enumerable.Min(Offsets).ToString("0.00") + "_to_" + Enumerable.Max(Offsets).ToString("0.00");
+            filename += "_" + Enumerable.Min(Offsets).ToString("0.00") + "_to_" + Enumerable.Max(Offsets).ToString("0.00");
             if (OptimizerMethod == OptimizerMethod.Annealing) {
                 filename += "_temp_" + Temperatures[0].ToString("0.00") + "_to_" + Temperatures[^1].ToString("0.00");
             }
             if (Smoothened) {
-                filename += "_" + SmoothingMethod.ToString();
+                filename += "_" + SmoothingMethod.ToString() + "_at_" + SmoothingStrength.ToString("0.00");
             }
             return filename;
         }
