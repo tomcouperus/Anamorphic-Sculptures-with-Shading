@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.VisualScripting;
-using UnityEditor.PackageManager;
 using UnityEngine;
 
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
@@ -633,6 +632,8 @@ public class VertexNormalOptimizer : MonoBehaviour {
 
         // Start the enumerator
         StartCoroutine(SmoothingIterative());
+        // Switch to the correct mesh
+        SwitchMesh();
     }
 
     private IEnumerator SmoothingIterative() {
@@ -648,14 +649,33 @@ public class VertexNormalOptimizer : MonoBehaviour {
         saveData.SmoothenedAngularDeviation = Enumerable.Sum(smoothenedAngularDeviations);
         Debug.Log("Angular deviation: " + saveData.SmoothenedAngularDeviation);
 
+        // Other save data
+        saveData.FinalVertices = smoothedVertices;
+
         // Set the status
         Status = OptimizerStatus.Smoothed;
     }
 
     private Func<int, int> SmoothLaplacian() {
         smoothingSteps = smoothedVertices.Length;
+
+        Dictionary<int, HashSet<int>> meshNeighbours = CalculateMeshNeighbours(smoothedMesh);
+
         return (int i) => {
             Debug.Log("Smoothing vertex " + i);
+            // Obtain current vertex's neighbours
+            HashSet<int> neighbours = meshNeighbours[i];
+            // Take average of neighbour's position from optimized mesh
+            Vector3 smoothPosition = Vector3.zero;
+            foreach (int ni in neighbours) {
+                smoothPosition += optimizedVertices[ni];
+            }
+            smoothPosition /= neighbours.Count;
+
+            // Set new position
+            smoothedVertices[i] = smoothPosition;
+            smoothedMesh.SetVertices(smoothedVertices);
+
             return 0;
         };
     }
@@ -817,6 +837,41 @@ public class VertexNormalOptimizer : MonoBehaviour {
         return angularDeviations;
     }
 
+    private static Dictionary<int, HashSet<int>> CalculateMeshNeighbours(Mesh mesh) {
+        // Calculate the neigbours of a vertex according to the mesh
+        int[] triangles = mesh.triangles;
+        Dictionary<int, HashSet<int>> meshNeighbours = new();
+        for (int i = 0; i < triangles.Length / 3; i++) {
+            // Vertex indices
+            int a = triangles[3 * i];
+            int b = triangles[3 * i + 1];
+            int c = triangles[3 * i + 2];
+
+            // Add b and c to a's list, and vv
+            if (!meshNeighbours.ContainsKey(a)) meshNeighbours.Add(a, new());
+            meshNeighbours[a].Add(b);
+            meshNeighbours[a].Add(c);
+            if (!meshNeighbours.ContainsKey(b)) meshNeighbours.Add(b, new());
+            meshNeighbours[b].Add(a);
+            meshNeighbours[b].Add(c);
+            if (!meshNeighbours.ContainsKey(c)) meshNeighbours.Add(c, new());
+            meshNeighbours[c].Add(a);
+            meshNeighbours[c].Add(b);
+        }
+
+        // Combine the sets of the vertex indices that occupy the same space
+        // Collect vertex identities
+        List<int>[] vertexIdentityMap = CreateVertexIdentityMap(mesh.vertices);
+        for (int i = 0; i < vertexIdentityMap.Length; i++) {
+            // Add all identical vertices to current
+            foreach (int vi in vertexIdentityMap[i]) {
+                if (vi == i) continue;
+                meshNeighbours[i].AddRange(meshNeighbours[vi]);
+            }
+        }
+        return meshNeighbours;
+    }
+
     // DEBUG METHODS
 #if UNITY_EDITOR
     private void DrawInitializedGizmos() {
@@ -935,16 +990,19 @@ public class VertexNormalOptimizer : MonoBehaviour {
     // Save data class
     [Serializable]
     private class VertexNormalOptimizerData {
-        // Static data
+        // General data
         public string ObjectName;
-        public int TimeMilliseconds;
         public int Seed;
         public int VertexCount;
+        // Deforming
         public float DeformedAngularDeviation;
         public DeformationMethod DeformationMethod;
+        // Optimizing
         public string VertexSelectionMethod;
         public OptimizerMethod OptimizerMethod;
         public float SamplingRate;
+        public int TimeMilliseconds;
+        // Smoothing
         public bool Smoothened;
         public SmoothingMethod SmoothingMethod;
         public float SmoothenedAngularDeviation;
@@ -984,7 +1042,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
                 filename += "_temp_" + Temperatures[0].ToString("0.00") + "_to_" + Temperatures[^1].ToString("0.00");
             }
             if (Smoothened) {
-                filename += "_" + SmoothingMethod.ToString() + "_";
+                filename += "_" + SmoothingMethod.ToString();
             }
             return filename;
         }
