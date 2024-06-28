@@ -1043,7 +1043,7 @@ public class VertexNormalOptimizer : MonoBehaviour {
         public string FileName() {
             string filename = ObjectName.Replace(' ', '_');
             filename += "_" + DeformationMethod.ToString();
-            filename += "_" + Seed.ToString();
+            filename += "_S" + Seed.ToString();
             filename += "-" + ChosenVertices.Count + "-" + OptimizerMethod.ToString();
             if (OptimizerMethod == OptimizerMethod.Iterative) {
                 filename += "_at_" + SamplingRate.ToString("0.000");

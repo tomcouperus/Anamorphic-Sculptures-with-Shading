@@ -967,6 +967,6 @@ public class AnamorphicMapper : MonoBehaviour {
             originalObjects[i].gameObject.SetActive(i == originalObjectIndex);
         }
         UpdateShaderRelativePlane();
-        UpdateMaterials();
+        // UpdateMaterials();
     }
 }
